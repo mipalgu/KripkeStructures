@@ -1,9 +1,9 @@
 /*
- * KripkeStructureView.swift
- * ModelChecking
+ * KripkeVariablesModifier.swift 
+ * FSM 
  *
- * Created by Callum McColl on 15/10/18.
- * Copyright © 2018 Callum McColl. All rights reserved.
+ * Created by Callum McColl on 05/10/2016.
+ * Copyright © 2016 Callum McColl. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,10 +56,51 @@
  *
  */
 
-import KripkeStructure
+/**
+ *  Allows conforming types to manipulate the values of variables that are used
+ *  in `KripkeStructures`.
+ */
+public protocol KripkeVariablesModifier {
 
-public protocol KripkeStructureView: AnyObject {
+    /**
+     * Allows conforming types to create computed variables that are only seen
+     * by the model generation.  This is especially useful when representing
+     * conditions that influence the execution.  For example: when executing
+     * a state using the `MiPalRinglet`, the onEntry action is not executed
+     * if the previous state equals the current state.  In order to minimise
+     * combinatorial state explosion, it is worth ignoring the previous state,
+     * and simply using a 'shouldExecuteOnEntry' computedVar instead.  This
+     * means that there are only 2 possible combinations, either
+     * 'shouldExecuteOnEntry' is false, or 'shouldExecuteOnEntry' is true,
+     * rather than the 'n' possible situations where the previous state could
+     * be set to some arbitrary value.
+     */
+    var computedVars: [String: Any] { get }
 
-    func generate(store: KripkeStructure, usingClocks: Bool) throws
+    /**
+     *  A dictionary where the keys represent the label of each variables and
+     *  the values represent a function which takes a current value and
+     *  manipulates it and returns the new value, which the `KripkeStructure`
+     *  should use.
+     */
+    var manipulators: [String: (Any) -> Any] { get }
+
+    /**
+     *  A dictionary where the keys represent the labels of each variable and
+     *  the values represent all possible valid values of the variables.
+     */
+    var validVars: [String: [Any]] { get }
+
+}
+
+extension KripkeVariablesModifier {
+
+    public var computedVars: [String: Any] { [:] }
+
+    public var manipulators: [String: (Any) -> Any] { [:] }
+
+    public var validVars: [String: [Any]] { [:] }
+
+    public var spinVars: [String: [Any]] { [:] }
 
 }

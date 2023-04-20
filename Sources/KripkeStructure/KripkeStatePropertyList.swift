@@ -62,8 +62,6 @@ import Darwin
 import Glibc
 #endif
 
-import Functional
-
 public struct KripkeStatePropertyList: Codable {
 
     public fileprivate(set) var properties: [String: KripkeStateProperty]
@@ -200,37 +198,9 @@ extension KripkeStatePropertyList: Collection {
 public extension KripkeStatePropertyList {
 
     func merged(_ other: KripkeStatePropertyList) -> KripkeStatePropertyList {
-        return KripkeStatePropertyList(self.properties <| other.properties)
+        return KripkeStatePropertyList(self.properties.merged(other.properties))
     }
 
-}
-
-/**
- *  Creates a new dictioanry where `lhs` is merged with `rhs`.
- *
- *  - Attention: If there are conflicting keys, `rhs` has priority.
- *
- *  - SeeAlso: `Dictionary.merged(_:)`.
- */
-public func <| (
-    lhs: KripkeStatePropertyList,
-    rhs: KripkeStatePropertyList
-) -> KripkeStatePropertyList {
-    return lhs.merged(rhs)
-}
-
-/**
- *  Creates a new dictioanry where `lhs` is merged with `rhs`.
- *
- *  - Attention: If there are conflicting keys, `lhs` has priority.
- *
- *  - SeeAlso: `Dictionary.merged(_:)`.
- */
-public func |> (
-    lhs: KripkeStatePropertyList,
-    rhs: KripkeStatePropertyList
-) -> KripkeStatePropertyList {
-    return rhs.merged(lhs)
 }
 
 /**
@@ -272,27 +242,3 @@ public extension Dictionary where Key == String, Value == KripkeStateProperty {
     }
 
 }
-
-public func <| (
-    lhs: [String: KripkeStateProperty],
-    rhs: [String: KripkeStateProperty]
-) -> [String: KripkeStateProperty] {
-    return lhs.merged(rhs)
-}
-
-public func |> (
-    lhs: [String: KripkeStateProperty],
-    rhs: [String: KripkeStateProperty]
-) -> [String: KripkeStateProperty] {
-    return rhs.merged(lhs)
-}
-
-/**
- *  The `Dictionary` merge operator with right priority.
- */
-infix operator <| : LeftFunctionalPrecedence
-
-/**
- *  The `Dictionary` merge operator with left priority.
- */
-infix operator |> : LeftFunctionalPrecedence

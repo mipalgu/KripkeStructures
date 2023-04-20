@@ -56,7 +56,6 @@
  *
  */
 
-import Hashing
 import IO
 import KripkeStructure
 

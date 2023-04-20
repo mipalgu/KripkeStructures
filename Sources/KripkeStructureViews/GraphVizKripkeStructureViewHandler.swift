@@ -58,7 +58,6 @@
 
 import IO
 import KripkeStructure
-import swift_helpers
 
 public final class GraphVizKripkeStructureViewHandler: GenericKripkeStructureViewHandler {
 

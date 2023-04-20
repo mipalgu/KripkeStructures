@@ -56,17 +56,13 @@
  *
  */
 
-import Hashing
 import IO
 import KripkeStructure
-import swift_helpers
-import Utilities
 
 #if os(macOS)
 import Darwin
 #else
 import Glibc
-import Verification
 #endif
 
 import SQLite
@@ -391,7 +387,7 @@ public final class NuSMVKripkeStructureView: KripkeStructureView {
         cases.reserveCapacity(state.edges.count)
         var urgentCases: [String: Set<String>] = [:]
         urgentCases.reserveCapacity(state.edges.count)
-        var sourceProps = self.extractor.extract(from: state.properties)
+        let sourceProps = self.extractor.extract(from: state.properties)
         state.edges.forEach { edge in
             var constraints: [String: ClockConstraint] = [:]
             if self.usingClocks, let referencingClock = edge.clockName, let constraint = edge.constraint {

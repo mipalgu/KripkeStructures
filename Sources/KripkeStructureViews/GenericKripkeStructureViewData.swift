@@ -56,7 +56,6 @@
  *
  */
 
-import Hashing
 import KripkeStructure
 
 //public final class GenericKripkeStructureViewData {

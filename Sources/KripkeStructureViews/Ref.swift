@@ -1,9 +1,9 @@
 /*
- * KripkeStructureView.swift
- * ModelChecking
+ * Ref.swift 
+ * FSM 
  *
- * Created by Callum McColl on 15/10/18.
- * Copyright © 2018 Callum McColl. All rights reserved.
+ * Created by Callum McColl on 15/06/2017.
+ * Copyright © 2017 Callum McColl. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,10 +56,20 @@
  *
  */
 
-import KripkeStructure
+class Ref<Value> {
 
-public protocol KripkeStructureView: AnyObject {
+    var value: Value
 
-    func generate(store: KripkeStructure, usingClocks: Bool) throws
+    init(value: Value) {
+        self.value = value
+    }
+
+}
+
+extension Ref: CustomStringConvertible {
+
+    var description: String {
+        return "\(self.value)"
+    }
 
 }

@@ -57,7 +57,6 @@
  */
 
 import KripkeStructure
-import Utilities
 
 public final class AnyKripkeStructureView: KripkeStructureView {
 

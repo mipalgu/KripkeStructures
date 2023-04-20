@@ -57,7 +57,6 @@
  */
 
 import KripkeStructure
-import Utilities
 
 public final class PropertyExtractor<Formatter: PropertyFormatter> {
 
@@ -66,7 +65,7 @@ public final class PropertyExtractor<Formatter: PropertyFormatter> {
     public init(formatter: Formatter) {
         self.formatter = formatter
     }
-    
+
     public func convert(label: String) -> String {
         return self.formatter.format(label: label)
     }

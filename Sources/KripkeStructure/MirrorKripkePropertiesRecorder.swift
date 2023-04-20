@@ -56,8 +56,6 @@
  *
  */
 
-import swiftfsm
-
 //swiftlint:disable force_cast
 //swiftlint:disable line_length
 
