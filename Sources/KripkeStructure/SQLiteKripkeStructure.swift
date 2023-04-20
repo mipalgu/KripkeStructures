@@ -153,14 +153,13 @@ public struct SQLiteKripkeStructure: MutableKripkeStructure {
         }
     }
     
-    internal init(savingInDirectory directory: String = "/tmp/swiftfsm", identifier: String) throws {
+    internal init(savingInDirectory directory: String, identifier: String, createTables: Bool = true) throws {
         self.identifier = identifier
         let name = identifier.components(separatedBy: .whitespacesAndNewlines).joined(separator: "-")
         let url = URL(fileURLWithPath: directory, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let fileURL = url.appendingPathComponent("\(name).sqlite3", isDirectory: false)
         let db = try Connection(fileURL.absoluteString)
-
         let statesTable = StatesTable(
             table: Table("States"),
             id: Expression<Int64>("id"),
@@ -168,8 +167,6 @@ public struct SQLiteKripkeStructure: MutableKripkeStructure {
             isAccepting: Expression<Bool>("isAccepting"),
             propertyList: Expression<String>("propertyList")
         )
-        try db.run(statesTable.table.drop(ifExists: true))
-        
         let edges = EdgesTable(
             table: Table("Edges"),
             id: Expression<Int64>("id"),
@@ -181,42 +178,42 @@ public struct SQLiteKripkeStructure: MutableKripkeStructure {
             source: Expression<Int64>("source"),
             target: Expression<Int64>("target")
         )
-        try db.run(edges.table.drop(ifExists: true))
-        
-        try db.run(statesTable.table.create { t in
-            t.column(statesTable.id, primaryKey: .autoincrement)
-            t.column(statesTable.isInitial)
-            t.column(statesTable.isAccepting)
-            t.column(statesTable.propertyList, unique: true)
-        })
-        
-        try db.run(statesTable.table.createIndex(statesTable.isInitial))
-        try db.run(statesTable.table.createIndex(statesTable.isAccepting))
-        
-        try db.run(edges.table.create { t in
-            t.column(edges.id, primaryKey: .autoincrement)
-            t.column(edges.clockName)
-            t.column(edges.constraint)
-            t.column(edges.resetClock)
-            t.column(edges.takeSnapshot)
-            t.column(edges.time)
-            t.column(edges.source)
-            t.column(edges.target)
-            t.foreignKey(
-                edges.source,
-                references: statesTable.table,
-                statesTable.id,
-                update: .cascade,
-                delete: .cascade
-            )
-            t.foreignKey(
-                edges.target,
-                references: statesTable.table,
-                statesTable.id,
-                update: .cascade,
-                delete: .cascade
-            )
-        })
+        if createTables {
+            try db.run(statesTable.table.drop(ifExists: true))
+            try db.run(edges.table.drop(ifExists: true))
+            try db.run(statesTable.table.create { t in
+                t.column(statesTable.id, primaryKey: .autoincrement)
+                t.column(statesTable.isInitial)
+                t.column(statesTable.isAccepting)
+                t.column(statesTable.propertyList, unique: true)
+            })
+            try db.run(statesTable.table.createIndex(statesTable.isInitial))
+            try db.run(statesTable.table.createIndex(statesTable.isAccepting))
+            try db.run(edges.table.create { t in
+                t.column(edges.id, primaryKey: .autoincrement)
+                t.column(edges.clockName)
+                t.column(edges.constraint)
+                t.column(edges.resetClock)
+                t.column(edges.takeSnapshot)
+                t.column(edges.time)
+                t.column(edges.source)
+                t.column(edges.target)
+                t.foreignKey(
+                    edges.source,
+                    references: statesTable.table,
+                    statesTable.id,
+                    update: .cascade,
+                    delete: .cascade
+                )
+                t.foreignKey(
+                    edges.target,
+                    references: statesTable.table,
+                    statesTable.id,
+                    update: .cascade,
+                    delete: .cascade
+                )
+            })
+        }
         self.db = db
         self.statesTable = statesTable
         self.edges = edges
