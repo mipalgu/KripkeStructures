@@ -26,7 +26,7 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "KripkeStructure",
-            dependencies: []),
+            dependencies: [.product(name: "SQLite", package: "SQLite.swift")]),
         .target(
             name: "KripkeStructureViews",
             dependencies: [
