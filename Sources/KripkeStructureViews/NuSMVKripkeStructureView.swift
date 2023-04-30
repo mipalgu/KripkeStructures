@@ -320,7 +320,7 @@ public final class NuSMVKripkeStructureView: KripkeStructureView {
         stream.write("    \"error\",\n")
         stream.write("    \"executing\",\n")
         stream.write("    \"finished\",\n")
-        stream.write("    \"waiting\",\n")
+        stream.write("    \"waiting\"\n")
         stream.write("};\n\n")
         for (property, values) in self.db.propertyValues {
             guard let first = values.first(where: { _ in true }) else {
