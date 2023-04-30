@@ -189,7 +189,7 @@ public struct SQLiteKripkeStructure: MutableKripkeStructure {
 
     public init(readingAt fileURL: URL) throws {
         var fileName = fileURL.lastPathComponent
-        let suffix = ".sqlite"
+        let suffix = ".sqlite3"
         if fileName.hasSuffix(suffix) { fileName.removeLast(suffix.count) }
         fileName = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !fileName.isEmpty else { throw ValidationError("Invalid name of file: \(fileName).") }
