@@ -316,6 +316,12 @@ public final class NuSMVKripkeStructureView: KripkeStructureView {
                 stream.write("INVAR TRUE -> \($0)-time >= c;\n\n")
             }
         }
+        stream.write("VAR status: {\n")
+        stream.write("    \"error\",\n")
+        stream.write("    \"executing\",\n")
+        stream.write("    \"finished\",\n")
+        stream.write("    \"waiting\",\n")
+        stream.write("};\n\n")
         for (property, values) in self.db.propertyValues {
             guard let first = values.first(where: { _ in true }) else {
                 stream.write("\(property) : {};\n\n")
@@ -441,10 +447,11 @@ public final class NuSMVKripkeStructureView: KripkeStructureView {
     
     private func createWaitCase() -> String {
         let condition = "TRANS c < sync"
+        let mandatory = ["next(status) = status"]
         let extras = self.usingClocks ? ["next(sync) = sync", "next(c) = sync"] : []
         let clockNames = self.clocks.subtracting(["c"])
         let fullList = (Array(self.db.propertyNames) + Array(clockNames)) + clockNames.subtracting(["c"]).map { $0 + "-time" }
-        let effects = fullList.sorted().map { "next(" + $0 + ") = " + $0 } + extras
+        let effects = fullList.sorted().map { "next(" + $0 + ") = " + $0 } + extras + mandatory
         let effectList = effects.combine("") { $0 + "\n    & " + $1 }
         return condition + "\n    -> " + effectList + ";"
     }
