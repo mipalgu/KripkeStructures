@@ -64,6 +64,16 @@ import Foundation
 public struct SQLiteKripkeStructure: MutableKripkeStructure {
 
     struct StatesTable {
+
+        static var defaultTable: StatesTable {
+            StatesTable(
+                table: Table("States"),
+                id: Expression<Int64>("id"),
+                isInitial: Expression<Bool>("isInitial"),
+                isAccepting: Expression<Bool>("isAccepting"),
+                propertyList: Expression<String>("propertyList")
+            )
+        }
         
         let table: Table
         
@@ -78,6 +88,20 @@ public struct SQLiteKripkeStructure: MutableKripkeStructure {
     }
     
     struct EdgesTable {
+
+        static var defaultTable: EdgesTable {
+            EdgesTable(
+                table: Table("Edges"),
+                id: Expression<Int64>("id"),
+                clockName: Expression<String?>("clockName"),
+                constraint: Expression<String?>("constraint"),
+                resetClock: Expression<Bool>("resetClock"),
+                takeSnapshot: Expression<Bool>("takeSnapshot"),
+                time: Expression<Int64>("time"),
+                source: Expression<Int64>("source"),
+                target: Expression<Int64>("target")
+            )
+        }
         
         let table: Table
         
@@ -97,6 +121,16 @@ public struct SQLiteKripkeStructure: MutableKripkeStructure {
         
         let target: Expression<Int64>
         
+    }
+
+    public struct ValidationError: Hashable, Codable, Sendable, Error {
+
+        public let message: String
+
+        init(_ message: String) {
+            self.message = message
+        }
+
     }
     
     private let db: Connection
@@ -152,9 +186,17 @@ public struct SQLiteKripkeStructure: MutableKripkeStructure {
             }
         }
     }
+
+    public init(readingAt fileURL: URL) throws {
+        var fileName = fileURL.lastPathComponent
+        let suffix = ".sqlite"
+        if fileName.hasSuffix(suffix) { fileName.removeLast(suffix.count) }
+        fileName = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !fileName.isEmpty else { throw ValidationError("Invalid name of file: \(fileName).") }
+        self.init(db: try Connection(fileURL.absoluteString), identifier: fileName)
+    }
     
-    internal init(savingInDirectory directory: String, identifier: String, createTables: Bool = true) throws {
-        self.identifier = identifier
+    public init(savingInDirectory directory: String, identifier: String, createTables: Bool = true) throws {
         let name = identifier.components(separatedBy: .whitespacesAndNewlines).joined(separator: "-")
         let url = URL(fileURLWithPath: directory, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -214,7 +256,17 @@ public struct SQLiteKripkeStructure: MutableKripkeStructure {
                 )
             })
         }
+        self.init(db: db, identifier: identifier, statesTable: statesTable, edges: edges)
+    }
+
+    init(
+        db: Connection,
+        identifier: String,
+        statesTable: StatesTable = .defaultTable,
+        edges: EdgesTable = .defaultTable
+    ) {
         self.db = db
+        self.identifier = identifier
         self.statesTable = statesTable
         self.edges = edges
     }
