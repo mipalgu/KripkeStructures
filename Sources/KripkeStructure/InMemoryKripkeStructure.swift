@@ -82,11 +82,11 @@ public final class InMemoryKripkeStructure: MutableKripkeStructure {
         })
     }
 
-    init(identifier: String) {
+    public init(identifier: String) {
         self.identifier = identifier
     }
 
-    init(identifier: String, states: Set<KripkeState>) throws {
+    public init(identifier: String, states: Set<KripkeState>) throws {
         self.identifier = identifier
         for state in states {
             let id = try self.add(state.properties, isInitial: state.isInitial)
