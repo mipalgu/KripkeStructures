@@ -381,7 +381,7 @@ public final class NuSMVKripkeStructureView: KripkeStructureView {
         if self.usingClocks {
             outputStream.write(self.createWaitCase() + "\n\n")
         }
-        outputStream.write("TRANS status = \"finished\" -> next(status) = \"finished\";\n\n")
+        outputStream.write(self.createFinishCase() + "\n\n")
         outputStream.write("TRANS status = \"error\" -> next(status) = \"error\";\n\n")
     }
 
@@ -446,9 +446,20 @@ public final class NuSMVKripkeStructureView: KripkeStructureView {
     }
     
     private func createWaitCase() -> String {
-        let condition = "TRANS c < sync"
+        let condition = "TRANS c < sync & status != \"finished\""
         let mandatory = ["next(status) = status"]
         let extras = self.usingClocks ? ["next(sync) = sync", "next(c) = sync"] : []
+        let clockNames = self.clocks.subtracting(["c"])
+        let fullList = (Array(self.db.propertyNames) + Array(clockNames)) + clockNames.subtracting(["c"]).map { $0 + "-time" }
+        let effects = fullList.sorted().map { "next(" + $0 + ") = " + $0 } + extras + mandatory
+        let effectList = effects.combine("") { $0 + "\n    & " + $1 }
+        return condition + "\n    -> " + effectList + ";"
+    }
+    
+    private func createFinishCase() -> String {
+        let condition = "TRANS status = \"finished\""
+        let mandatory = ["next(status) = status"]
+        let extras = self.usingClocks ? ["next(sync) = sync", "next(c) = c"] : []
         let clockNames = self.clocks.subtracting(["c"])
         let fullList = (Array(self.db.propertyNames) + Array(clockNames)) + clockNames.subtracting(["c"]).map { $0 + "-time" }
         let effects = fullList.sorted().map { "next(" + $0 + ") = " + $0 } + extras + mandatory
