@@ -306,14 +306,14 @@ public final class NuSMVKripkeStructureView: KripkeStructureView {
     fileprivate func createPropertiesList(usingStream stream: inout TextOutputStream) {
         if self.usingClocks {
             stream.write("VAR sync: real;\n")
-            stream.write("INVAR TRUE -> sync >= 0;\n\n")
+            stream.write("INVAR sync >= 0;\n\n")
             stream.write("VAR c: clock;\n")
-            stream.write("INVAR TRUE -> c >= 0;\n")
-            stream.write("INVAR TRUE -> c <= sync;\n\n")
+            stream.write("INVAR c >= 0;\n")
+            stream.write("INVAR c <= sync;\n\n")
             self.clocks.lazy.filter { $0 != "c" }.sorted().forEach {
                 stream.write("VAR \($0): real;\n")
                 stream.write("VAR \($0)-time: clock;\n")
-                stream.write("INVAR TRUE -> \($0)-time >= c;\n\n")
+                stream.write("INVAR \($0)-time >= c;\n\n")
             }
         }
         stream.write("VAR status: {\n")
