@@ -170,11 +170,14 @@ where Key: CodingKey {
     }
 
     func superDecoder() throws -> Decoder {
-        fatalError("nyi")
+        let property = KripkeStateProperty(type: .Compound(plist), value: plist.properties.mapValues(\.value))
+        return KripkeStatePropertyDecoding(codingPath: codingPath, userInfo: [:], property: property)
     }
 
     func superDecoder(forKey key: Key) throws -> Decoder {
-        fatalError("nyi")
+        try performProperty(forKey: key) { property in
+            KripkeStatePropertyDecoding(codingPath: codingPath + [key], userInfo: [:], property: property)
+        }
     }
 
 }

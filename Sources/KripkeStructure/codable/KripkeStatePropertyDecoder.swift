@@ -1,9 +1,17 @@
 public final class KripkeStatePropertyDecoder {
 
-    public init() {}
+    private var codingPath: [CodingKey]
+
+    public convenience init() {
+        self.init(codingPath: [])
+    }
+
+    init(codingPath: [CodingKey]) {
+        self.codingPath = codingPath
+    }
 
     public func decode<T>(_ type: T.Type, from property: KripkeStateProperty) throws -> T where T: Decodable {
-        let decoder = KripkeStatePropertyDecoding(codingPath: [], userInfo: [:], property: property)
+        let decoder = KripkeStatePropertyDecoding(codingPath: codingPath, userInfo: [:], property: property)
         return try T(from: decoder)
     }
 

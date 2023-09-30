@@ -152,7 +152,9 @@ final class KripkeStatePropertyUnkeyedDecodingContainer: UnkeyedDecodingContaine
     }
 
     func superDecoder() throws -> Decoder {
-        fatalError("nyi")
+        try performProperty { property in
+            KripkeStatePropertyDecoding(codingPath: codingPath, userInfo: [:], property: property)
+        }
     }
 
 }

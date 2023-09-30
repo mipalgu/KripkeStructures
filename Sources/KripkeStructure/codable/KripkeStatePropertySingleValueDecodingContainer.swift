@@ -1,5 +1,7 @@
 final class KripkeStatePropertySingleValueDecodingContainer: SingleValueDecodingContainer {
 
+    private let decoder: KripkeStatePropertyDecoder
+
     let codingPath: [CodingKey]
 
     let property: KripkeStateProperty
@@ -7,6 +9,7 @@ final class KripkeStatePropertySingleValueDecodingContainer: SingleValueDecoding
     init(codingPath: [CodingKey], property: KripkeStateProperty) {
         self.codingPath = codingPath
         self.property = property
+        self.decoder = KripkeStatePropertyDecoder(codingPath: codingPath)
     }
 
     func decodeNil() -> Bool {
@@ -199,7 +202,7 @@ final class KripkeStatePropertySingleValueDecodingContainer: SingleValueDecoding
     }
 
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
-        fatalError("nyi")
+        return try decoder.decode(type, from: property)
     }
 
 }
