@@ -121,13 +121,27 @@ final class KripkeStatePropertyUnkeyedDecodingContainer: UnkeyedDecodingContaine
     }
 
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
-        fatalError("nyi")
+        try perform { try $0.decode(type) }
     }
 
     func nestedContainer<NestedKey>(
         keyedBy type: NestedKey.Type
     ) throws -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
-        fatalError("nyi")
+        try performProperty { property in
+            guard case .Compound(let plist) = property.type else {
+                // swiftlint:disable line_length
+                throw DecodingError.dataCorruptedError(
+                    in: self,
+                    debugDescription: "Cannot convert property to compound property type when creating nested container."
+                )
+                // swiftlint:enable line_length
+            }
+            let container = KripkeStatePropertyKeyedDecodingContainer<NestedKey>(
+                codingPath: codingPath,
+                plist: plist
+            )
+            return KeyedDecodingContainer(container)
+        }
     }
 
     func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {

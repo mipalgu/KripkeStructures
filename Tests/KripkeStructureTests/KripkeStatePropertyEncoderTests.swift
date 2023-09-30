@@ -3,9 +3,9 @@ import XCTest
 
 final class RawBytesEncoderTests: XCTestCase {
 
-    struct Person: Codable {
+    struct Person: Hashable, Codable {
 
-        struct Friend: Codable {
+        struct Friend: Hashable, Codable {
 
             var friendsName: String
 
@@ -48,6 +48,9 @@ final class RawBytesEncoderTests: XCTestCase {
             value: person
         )
         XCTAssertEqual(expected, property)
+        let decoder = KripkeStatePropertyDecoder()
+        let result = try decoder.decode(Person.self, from: property)
+        XCTAssertEqual(person, result)
     }
 
 }
