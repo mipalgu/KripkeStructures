@@ -14,6 +14,24 @@ final class KripkeStatePropertyUnkeyedDecodingContainer: UnkeyedDecodingContaine
         currentIndex >= properties.count
     }
 
+    convenience init(codingPath: [CodingKey], property: KripkeStateProperty) throws {
+        guard case .Collection(let properties) = property.type else {
+            guard property.type == .EmptyCollection else {
+                // swiftlint:disable line_length
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: codingPath,
+                        debugDescription: "Attempting to create nested unkeyed container for non-collection value \(property.value)"
+                    )
+                )
+                // swiftlint:enable line_length
+            }
+            self.init(codingPath: codingPath, properties: [])
+            return
+        }
+        self.init(codingPath: codingPath, properties: properties)
+    }
+
     init(codingPath: [CodingKey], properties: [KripkeStateProperty]) {
         self.codingPath = codingPath
         self.properties = properties

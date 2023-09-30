@@ -9,6 +9,20 @@ where Key: CodingKey {
         plist.properties.keys.compactMap(Key.init)
     }
 
+    convenience init(codingPath: [CodingKey], property: KripkeStateProperty) throws {
+        guard case .Compound(let plist) = property.type else {
+            // swiftlint:disable line_length
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: codingPath,
+                    debugDescription: "Cannot convert property to compound property type when creating container."
+                )
+            )
+            // swiftlint:enable line_length
+        }
+        self.init(codingPath: codingPath, plist: plist)
+    }
+
     init(codingPath: [CodingKey], plist: KripkeStatePropertyList) {
         self.codingPath = codingPath
         self.plist = plist
