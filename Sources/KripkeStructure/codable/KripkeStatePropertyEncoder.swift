@@ -19,4 +19,14 @@ public struct KripkeStatePropertyEncoder {
         )
     }
 
+    public func encode<T>(asPlist value: T) throws -> KripkeStatePropertyList where T: Encodable {
+        let property = try encode(value)
+        switch property.type {
+        case .Compound(let plist):
+            return plist
+        default:
+            fatalError("Attempting to encode \(value) that cannot be converted to a KripkeStatePropertyList.")
+        }
+    }
+
 }
