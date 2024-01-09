@@ -167,8 +167,6 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
 
     }
 
-    fileprivate let extractor: PropertyExtractor<NuSMVPropertyFormatter>
-
     fileprivate let identifier: String
 
     fileprivate let outputStreamFactory: OutputStreamFactory
@@ -187,11 +185,9 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
 
     public init(
         identifier: String,
-        extractor: PropertyExtractor<NuSMVPropertyFormatter> = PropertyExtractor(formatter: NuSMVPropertyFormatter()),
         outputStreamFactory: OutputStreamFactory = FileOutputStreamFactory()
     ) throws {
         self.identifier = identifier
-        self.extractor = extractor
         self.outputStreamFactory = outputStreamFactory
         let name = identifier.components(separatedBy: .whitespacesAndNewlines).joined(separator: "-")
         let db = try Connection("\(name).uppaal.sqlite3")
@@ -229,10 +225,10 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
 
     private func commit(state: KripkeState) throws {
         state.edges.lazy.compactMap { $0.clockName }.forEach {
-            let clockName = self.extractor.convert(label: $0)
+            let clockName = self.convert(label: $0)
             self.clocks.insert(clockName)
         }
-        let props = self.extractor.extract(from: state.properties)
+        let props = self.extract(from: state.properties)
         for (key, value) in props {
             try self.db.insertIfNotExists(property: key, value: value)
         }
@@ -293,7 +289,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         let allClocks = self.usingClocks ? self.clocks.sorted() : []
         stream.write("INIT\n")
         let initials = try self.store.initialStates.lazy.map {
-            var props = self.extractor.extract(from: $0.properties)
+            var props = self.extract(from: $0.properties)
             if self.usingClocks {
                 props["sync"] = "0"
                 props["c"] = "0"
@@ -323,7 +319,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
             outputStream.write("\n")
         }
         try self.store.acceptingStates.forEach {
-            let props = self.extractor.extract(from: $0.properties)
+            let props = self.extract(from: $0.properties)
             let conditions = self.createAcceptingTansition(for: props)
             outputStream.write(conditions + "\n\n")
         }
@@ -342,15 +338,15 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         cases.reserveCapacity(state.edges.count)
         var urgentCases: [String: Set<String>] = [:]
         urgentCases.reserveCapacity(state.edges.count)
-        let sourceProps = self.extractor.extract(from: state.properties)
+        let sourceProps = self.extract(from: state.properties)
         state.edges.forEach { edge in
             var constraints: [String: ClockConstraint] = [:]
             if self.usingClocks, let referencingClock = edge.clockName, let constraint = edge.constraint {
-                let clockName = self.extractor.convert(label: referencingClock)
+                let clockName = self.convert(label: referencingClock)
                 constraints[clockName] = constraint
             }
             
-            let targetProps = self.extractor.extract(from: edge.target)
+            let targetProps = self.extract(from: edge.target)
             var newCases: [String: String] = [:]
             newCases.reserveCapacity(2)
             if self.usingClocks {
@@ -465,7 +461,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                 props["c"] = "0"
             }
             if let rawClockName = clockName {
-                let clockName = self.extractor.convert(label: rawClockName)
+                let clockName = self.convert(label: rawClockName)
                 if resetClock {
                     props[clockName + "-time"] = "0"
                 }
@@ -495,6 +491,187 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
             }
             return "next(" + $0.key + ")=" + $0.value
         }.combine("") { $0 + "\n    & " + $1}
+    }
+
+    private func convert(label: String) -> String {
+        guard let first = label.first else {
+            return ""
+        }
+        var str = ""
+        if (first < "a" || first > "z") && (first < "A" || first > "Z") {
+            str += "_"
+        }
+        str += self.formatString(label)
+        return str
+    }
+
+    private func formatString(_ str: String) -> String {
+        return str.lazy.map {
+            if $0 == "." {
+                return "."
+            }
+            if ($0 < "a" || $0 > "z")
+                && ($0 < "A" || $0 > "Z")
+                && ($0 < "0" || $0 > "9")
+            {
+                return ""
+            }
+            return "\($0)"
+        }.joined()
+    }
+
+    public func extract(from list: KripkeStatePropertyList) -> [String: String] {
+        let dict: Ref<[String: String]> = Ref(value: [:])
+        self.convert(list, properties: dict)
+        return dict.value
+    }
+
+    fileprivate func convert(
+        _ list: KripkeStatePropertyList,
+        properties: Ref<[String: String]>,
+        prepend: String? = nil
+    ) {
+        let preLabel = prepend.map { $0 + "." } ?? ""
+        list.forEach { (key, property) in
+            let label = self.convert(label: preLabel + key)
+            self.convert(property, properties: properties, label: label)
+        }
+    }
+
+    fileprivate func convert(_ property: KripkeStateProperty, properties: Ref<[String: String]>, label: String) {
+        switch property.type {
+        case .Bool:
+            properties.value[label] = "\(property.value as! Bool)"
+        case .Int:
+            self.convert(integer: property.value as! Int, properties: properties, label: label)
+        case .Int8:
+            self.convert(integer: property.value as! Int8, properties: properties, label: label)
+        case .Int16:
+            self.convert(integer: property.value as! Int16, properties: properties, label: label)
+        case .Int32:
+            self.convert(integer: property.value as! Int32, properties: properties, label: label)
+        case .Int64:
+            self.convert(integer: property.value as! Int64, properties: properties, label: label)
+        case .UInt:
+            self.convert(integer: property.value as! UInt, properties: properties, label: label)
+        case .UInt8:
+            self.convert(integer: property.value as! UInt8, properties: properties, label: label)
+        case .UInt16:
+            self.convert(integer: property.value as! UInt16, properties: properties, label: label)
+        case .UInt32:
+            self.convert(integer: property.value as! UInt32, properties: properties, label: label)
+        case .UInt64:
+            self.convert(integer: property.value as! UInt64, properties: properties, label: label)
+        case .Float, .Double:
+            fatalError("Floats and Doubles are not yet implemented.")
+#if (arch(i386) || arch(x86_64)) && !os(Windows) && !os(Android)
+        case .Float80:
+            fatalError("Float80 is not yet implemented.")
+#endif
+        case .String:
+            let str = property.value as! String
+            let cString = Array(str.utf8CString)
+            let props = cString.map { KripkeStateProperty(type: .Int8, value: Int8($0)) }
+            let collection = KripkeStateProperty(type: .Collection(props), value: props)
+            self.convert(collection, properties: properties, label: label)
+        case .Optional(let property):
+            switch property {
+            case .none:
+                self.convert(
+                    KripkeStateProperty(
+                        type: .Compound(
+                            KripkeStatePropertyList(properties: [
+                                "hasValue": KripkeStateProperty(type: .Bool, value: false as Any)
+                            ])
+                        ),
+                        value: ["hasValue": false as Any]
+                    ),
+                    properties: properties,
+                    label: label
+                )
+            case .some(let prop):
+                self.convert(
+                    KripkeStateProperty(
+                        type: .Compound(
+                            KripkeStatePropertyList(properties: [
+                                "hasValue": KripkeStateProperty(type: .Bool, value: true as Any),
+                                "value": prop
+                            ])
+                        ),
+                        value: [
+                            "hasValue": true as Any,
+                            "value": prop.value
+                        ]
+                    ),
+                    properties: properties,
+                    label: label
+                )
+            }
+        case .EmptyCollection:
+            return
+        case .Collection(let props):
+            for (index, property) in props.enumerated() {
+                self.convert(
+                    property,
+                    properties: properties,
+                    label: label + "[\(index)]"
+                )
+            }
+        case .Compound(let list):
+            self.convert(list, properties: properties, prepend: label)
+        }
+    }
+
+    private func convert<I: SignedInteger>(
+        integer value: I,
+        properties: Ref<[String: String]>,
+        label: String
+    ) {
+        if MemoryLayout<I>.size <= 4 {
+            properties.value[label] = "\(properties.value)"
+        } else {
+            guard let value = Int(exactly: value) else {
+                fatalError("Cannot encapsulate value '\(value)' within an Int.")
+            }
+            let bitPattern = UInt(bitPattern: value)
+            self.convert(bitPattern: bitPattern, properties: properties, label: label)
+        }
+    }
+
+    private func convert<I: UnsignedInteger>(
+        integer value: I,
+        properties: Ref<[String: String]>,
+        label: String
+    ) {
+        if MemoryLayout<I>.size < 4 {
+            properties.value[label] = "\(properties.value)"
+            return
+        } else {
+            guard let bitPattern = UInt(exactly: value) else {
+                fatalError("Cannot encapsulate value '\(value)' within a UInt.")
+            }
+            self.convert(bitPattern: bitPattern, properties: properties, label: label)
+        }
+    }
+
+    private func convert(bitPattern: UInt, properties: Ref<[String: String]>, label: String) {
+        let totalBytes = MemoryLayout<Int>.size
+        var dict: [String: UInt8] = [:]
+        dict.reserveCapacity(totalBytes)
+        for byteNumber in 0..<totalBytes {
+            dict["b\(byteNumber)"] = UInt8((bitPattern >> (8 * byteNumber)) & UInt(UInt8.max))
+        }
+        let plist = KripkeStatePropertyList(
+            properties: dict.mapValues { KripkeStateProperty(type: .UInt8, value: $0) }
+        )
+        self.convert(
+            KripkeStateProperty(
+                type: .Compound(plist),
+                value: dict
+            ),
+            properties: properties,
+            label: label
+        )
     }
 
 }
