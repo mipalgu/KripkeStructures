@@ -86,7 +86,7 @@ public final class InMemoryKripkeStructure: MutableKripkeStructure {
         self.identifier = identifier
     }
 
-    public init(identifier: String, states: Set<KripkeState>) throws {
+    public init<S: Sequence>(identifier: String, states: S) throws where S.Iterator.Element == KripkeState {
         self.identifier = identifier
         for state in states {
             let id = try self.add(state.properties, isInitial: state.isInitial)

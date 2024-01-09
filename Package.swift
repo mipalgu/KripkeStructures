@@ -37,5 +37,8 @@ let package = Package(
         .testTarget(
             name: "KripkeStructureTests",
             dependencies: ["KripkeStructure"]),
+        .testTarget(
+            name: "KripkeStructureViewsTests",
+            dependencies: ["KripkeStructure", "KripkeStructureViews"]),
     ]
 )
