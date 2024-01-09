@@ -1,0 +1,1 @@
+public typealias GraphVizKripkeStructureView = GenericKripkeStructureView<GraphVizKripkeStructureViewHandler>

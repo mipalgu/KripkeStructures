@@ -56,6 +56,8 @@
  *
  */
 
+//public typealias GexfKripkeStructureView = GenericKripkeStructureView<GexfKripkeStructureViewHandler>
+
 /*
 import FSM
 import IO
