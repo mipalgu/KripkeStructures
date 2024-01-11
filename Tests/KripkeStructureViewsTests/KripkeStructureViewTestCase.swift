@@ -58,11 +58,21 @@ class KripkeStructureViewTestCase: XCTestCase {
         states[0].addEdge(
             KripkeEdge(
                 clockName: "c0",
-                constraint: .equal(value: 3),
+                constraint: .lessThanEqual(value: 3),
                 resetClock: true,
                 takeSnapshot: true,
                 time: 5,
                 target: states[1].properties
+            )
+        )
+        states[1].addEdge(
+            KripkeEdge(
+                clockName: "c0",
+                constraint: .lessThanEqual(value: 3),
+                resetClock: true,
+                takeSnapshot: true,
+                time: 5,
+                target: states[0].properties
             )
         )
         return try InMemoryKripkeStructure(identifier: identifier, states: states)

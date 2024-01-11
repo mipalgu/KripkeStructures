@@ -112,7 +112,11 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         for state in try self.store.states {
             let stateID = try self.store.id(for: state.properties)
             let id = "id\(stateID)"
-            let location = UppaalLocation(id: id, name: UppaalName(name: id), type: .committed)
+            let location = UppaalLocation(
+                id: id,
+                name: UppaalName(name: id),
+                type: usingClocks ? .committed : .normal
+            )
             template.locations.append(location)
         }
     }
@@ -270,7 +274,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
             let cString = Array(str.utf8CString)
             let props = cString.map { KripkeStateProperty(type: .Int8, value: Int8($0)) }
             let collection = KripkeStateProperty(type: .Collection(props), value: props)
-            self.convert(collection, properties: properties, label: label, key: key)
+            _ = self.convert(collection, properties: properties, label: label, key: key)
             let typedef = key + "_str"
             if case .array(let innerType, let count) = typedefs[typedef], innerType == .int {
                 typedefs[typedef] = .array(.int, max(count, cString.count))
