@@ -182,9 +182,17 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                 )
                 template.transitions.append(syncTransition)
                 let transitionGuard = UppaalGuardLabel(condition: .equal("syn", "\(edge.time)"))
-                let transitionAssignment = UppaalAssignmentLabel(assignments: [
-                    UppaalAssignmentExpression(lhs: "syn", rhs: "0")
-                ])
+                let transitionMandatoryAssignment = UppaalAssignmentExpression(lhs: "syn", rhs: "0")
+                let transitionAssignments: [UppaalAssignmentExpression]
+                if edge.resetClock, let clockName = edge.clockName {
+                    transitionAssignments = [
+                        transitionMandatoryAssignment,
+                        UppaalAssignmentExpression(lhs: clockName, rhs: "0")
+                    ]
+                } else {
+                    transitionAssignments = [transitionMandatoryAssignment]
+                }
+                let transitionAssignment = UppaalAssignmentLabel(assignments: transitionAssignments)
                 let transition = UppaalTransition(
                     source: syncID,
                     target: targetID,
