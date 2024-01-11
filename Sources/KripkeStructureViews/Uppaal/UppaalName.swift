@@ -1,4 +1,4 @@
-struct UppaalName: Hashable, Codable, Sendable {
+struct UppaalName: Hashable, Codable, Sendable, ExpressibleByStringLiteral {
 
     var name: String
 
@@ -8,6 +8,10 @@ struct UppaalName: Hashable, Codable, Sendable {
 
     var modelRepresentation: String {
         "<name x=\"\(x)\" y=\"\(y)\">\(name)</name>"
+    }
+
+    init(stringLiteral value: String) {
+        self.init(name: value)
     }
 
     init(name: String, x: Int = 0, y: Int = 0) {
