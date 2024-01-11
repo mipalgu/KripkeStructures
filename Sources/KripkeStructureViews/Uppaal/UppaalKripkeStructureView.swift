@@ -25,6 +25,8 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
 
     private var variables: [String: UppaalType] = Dictionary(minimumCapacity: 100)
 
+    private var ids: [String: Int] = Dictionary(minimumCapacity: 1000)
+
     private var typedefDeclarations: String {
         typedefs.sorted { $0.key.count > $1.key.count }.compactMap { (key, type) in
             UppaalType.typedef(key).typedefDeclaration(aliasing: type) { self.typedefs[$0] != nil }
@@ -72,6 +74,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         self.store = nil
         self.typedefs.removeAll(keepingCapacity: true)
         self.variables.removeAll(keepingCapacity: true)
+        self.ids.removeAll(keepingCapacity: true)
     }
 
     private func finish() throws {
@@ -159,7 +162,8 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                 let assignmentLabel = UppaalAssignmentLabel(
                     assignments: assignments + [UppaalAssignmentExpression(lhs: "syn", rhs: "0")]
                 )
-                let syncID = sourceID + "sync" + targetID
+                let tempName = sourceID + targetID + "sync"
+                let syncID = tempName + id(for: tempName).description
                 let syncLocation = UppaalLocation(
                     id: syncID,
                     name: UppaalName(name: syncID),
@@ -201,6 +205,16 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                 )
                 template.transitions.append(transition)
             }
+        }
+    }
+
+    private func id(for label: String) -> Int {
+        if let id = ids[label] {
+            ids[label] = id + 1
+            return id
+        } else {
+            ids[label] = 0
+            return 0
         }
     }
 
