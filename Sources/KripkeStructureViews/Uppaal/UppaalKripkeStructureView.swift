@@ -237,261 +237,341 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
     private func finish() throws {
         defer { self.stream.close() }
         self.stream.flush()
-        if self.usingClocks {
-            self.stream.write("@TIME_DOMAIN continuous\n\n")
-        }
-        self.stream.write("MODULE main\n\n")
-        var outputStream: TextOutputStream = self.stream
-        self.createPropertiesList(usingStream: &outputStream)
-        try self.createInitial(usingStream: &outputStream)
-        try self.createTransitions(writingTo: &outputStream)
+        var template = UppaalTemplate(name: UppaalName(name: self.store.identifier))
+        try self.createInitial(&template)
+        try self.createLocations(&template)
+        try self.createTransitions(&template)
+        let model = UppaalModel(globalDeclarations: "", templates: [template])
+        self.stream.write(model.modelRepresentation)
+        // if self.usingClocks {
+        //     self.stream.write("@TIME_DOMAIN continuous\n\n")
+        // }
+        // self.stream.write("MODULE main\n\n")
+        // var outputStream: TextOutputStream = self.stream
+        // self.createPropertiesList(usingStream: &outputStream)
+        // try self.createInitial(usingStream: &outputStream)
+        // try self.createTransitions(writingTo: &outputStream)
         self.stream.flush()
     }
 
-    fileprivate func createPropertiesList(usingStream stream: inout TextOutputStream) {
-        if self.usingClocks {
-            stream.write("VAR sync: real;\n")
-            stream.write("INVAR sync >= 0;\n\n")
-            stream.write("VAR c: clock;\n")
-            stream.write("INVAR c >= 0;\n")
-            stream.write("INVAR c <= sync;\n\n")
-            self.clocks.lazy.filter { $0 != "c" }.sorted().forEach {
-                stream.write("VAR \($0): real;\n")
-                stream.write("VAR \($0)-time: clock;\n")
-                stream.write("INVAR \($0)-time >= c;\n\n")
-            }
-        }
-        stream.write("VAR status: {\n")
-        stream.write("    \"error\",\n")
-        stream.write("    \"executing\",\n")
-        stream.write("    \"finished\",\n")
-        stream.write("    \"waiting\"\n")
-        stream.write("};\n\n")
-        for (property, values) in self.db.propertyValues {
-            guard let first = values.first(where: { _ in true }) else {
-                stream.write("\(property) : {};\n\n")
-                return
-            }
-            stream.write("VAR \(property) : {\n")
-            stream.write("    " + first)
-            values.dropFirst().forEach {
-                stream.write(",\n    " + $0)
-            }
-            stream.write("\n};\n\n")
-        }
-    }
+    // fileprivate func createPropertiesList(usingStream stream: inout TextOutputStream) {
+    //     if self.usingClocks {
+    //         stream.write("VAR sync: real;\n")
+    //         stream.write("INVAR sync >= 0;\n\n")
+    //         stream.write("VAR c: clock;\n")
+    //         stream.write("INVAR c >= 0;\n")
+    //         stream.write("INVAR c <= sync;\n\n")
+    //         self.clocks.lazy.filter { $0 != "c" }.sorted().forEach {
+    //             stream.write("VAR \($0): real;\n")
+    //             stream.write("VAR \($0)-time: clock;\n")
+    //             stream.write("INVAR \($0)-time >= c;\n\n")
+    //         }
+    //     }
+    //     stream.write("VAR status: {\n")
+    //     stream.write("    \"error\",\n")
+    //     stream.write("    \"executing\",\n")
+    //     stream.write("    \"finished\",\n")
+    //     stream.write("    \"waiting\"\n")
+    //     stream.write("};\n\n")
+    //     for (property, values) in self.db.propertyValues {
+    //         guard let first = values.first(where: { _ in true }) else {
+    //             stream.write("\(property) : {};\n\n")
+    //             return
+    //         }
+    //         stream.write("VAR \(property) : {\n")
+    //         stream.write("    " + first)
+    //         values.dropFirst().forEach {
+    //             stream.write(",\n    " + $0)
+    //         }
+    //         stream.write("\n};\n\n")
+    //     }
+    // }
 
-    fileprivate func createInitial(usingStream stream: inout TextOutputStream) throws {
+    private func createInitial(_ template: inout UppaalTemplate) throws {
+        let id = "initial"
+        template.initialLocation = id
+        template.locations.append(UppaalLocation(id: id, name: UppaalName(name: id), type: .committed))
         if try nil == self.store.initialStates.first(where: { _ in true }) {
-            stream.write("INIT();\n")
             return
         }
-        let allClocks = self.usingClocks ? self.clocks.sorted() : []
-        stream.write("INIT\n")
         let initials = try self.store.initialStates.lazy.map {
-            var props = self.extract(from: $0.properties)
-            if self.usingClocks {
-                props["sync"] = "0"
-                props["c"] = "0"
-                allClocks.lazy.filter { $0 != "c" }.forEach {
-                    props[$0] = "0"
-                    props[$0 + "-time"] = "0"
-                }
-            }
-            props["status"] = "\"executing\""
-            return "(" + self.createConditions(of: props) { $0 + "\n    & " + $1 } + ")"
-        }.sorted().combine("") { $0 + "\n| " + $1 }
-        stream.write(initials + ";")
-        stream.write("\n\n")
-    }
-
-    fileprivate func createTransitions(
-        writingTo outputStream: inout TextOutputStream
-    ) throws {
-        let cases = try self.store.states.lazy.compactMap { (state) -> String? in
-            guard let content = self.createCase(of: state) else {
-                return nil
-            }
-            return content
-        }
-        for str in cases.sorted() {
-            outputStream.write(str)
-            outputStream.write("\n")
-        }
-        try self.store.acceptingStates.forEach {
+            let stateID = try self.store.id(for: $0.properties)
             let props = self.extract(from: $0.properties)
-            let conditions = self.createAcceptingTansition(for: props)
-            outputStream.write(conditions + "\n\n")
+            let assignments = props.map {
+                UppaalAssignmentExpression(lhs: $0, rhs: $1)
+            }
+            let assignmentLabel = UppaalAssignmentLabel(assignments: assignments)
+            let transition = UppaalTransition(
+                source: id,
+                target: "id\(stateID)",
+                assignmentLabel: assignmentLabel
+            )
+            return transition
         }
-        if self.usingClocks {
-            outputStream.write(self.createWaitCase() + "\n\n")
-        }
-        outputStream.write(self.createFinishCase() + "\n\n")
-        outputStream.write("TRANS status = \"error\" -> next(status) = \"error\";\n\n")
+        template.transitions.append(contentsOf: initials)
     }
 
-    fileprivate func createCase(of state: KripkeState) -> String? {
-        if state.edges.isEmpty {
-            return nil
+    private func createLocations(_ template: inout UppaalTemplate) throws {
+        for state in try self.store.states {
+            let stateID = try self.store.id(for: state.properties)
+            let id = "id\(stateID)"
+            let location = UppaalLocation(id: id, name: UppaalName(name: id), type: .committed)
+            template.locations.append(location)
         }
-        var cases: [String: Set<String>] = [:]
-        cases.reserveCapacity(state.edges.count)
-        var urgentCases: [String: Set<String>] = [:]
-        urgentCases.reserveCapacity(state.edges.count)
-        let sourceProps = self.extract(from: state.properties)
-        state.edges.forEach { edge in
-            var constraints: [String: ClockConstraint] = [:]
-            if self.usingClocks, let referencingClock = edge.clockName, let constraint = edge.constraint {
-                let clockName = self.convert(label: referencingClock)
-                constraints[clockName] = constraint
-            }
-            
-            let targetProps = self.extract(from: edge.target)
-            var newCases: [String: String] = [:]
-            newCases.reserveCapacity(2)
-            if self.usingClocks {
-                var sourceProps = sourceProps
-                sourceProps["status"] = "\"executing\""
-                let conditions = self.createConditions(of: sourceProps, constraints: constraints)
-                newCases[conditions] = self.createEffect(from: ["status": "\"waiting\""], duration: edge.time)
-                sourceProps["status"] = "\"waiting\""
-                let executingCondition = self.createConditions(of: sourceProps, constraints: constraints)
-                var targetProps = targetProps
-                targetProps["c"] = "0"
-                targetProps["sync"] = "0"
-                targetProps["status"] = "\"executing\""
-                newCases[executingCondition] = self.createEffect(from: targetProps, clockName: edge.clockName, resetClock: edge.resetClock, readTime: edge.takeSnapshot)
+    }
+
+    private func createTransitions(_ template: inout UppaalTemplate) throws {
+        for state in try self.store.states where !state.edges.isEmpty {
+            let stateID = try self.store.id(for: state.properties)
+            let sourceID = "id\(stateID)"
+            let stateProps = self.extract(from: state.properties)
+            let startingCondition: UppaalLogicalCondition?
+            if let (key, value) = stateProps.first {
+                startingCondition = stateProps.dropFirst().map {
+                    UppaalLogicalCondition.equal($0, $1)
+                }.reduce(UppaalLogicalCondition.equal(key, value)) {
+                    UppaalLogicalCondition.and($0, $1)
+                }
             } else {
-                let conditions = self.createConditions(of: sourceProps, constraints: constraints)
-                newCases[conditions] = self.createEffect(from: targetProps)
+                startingCondition = nil
             }
-            for (conditions, effect) in newCases {
-                if nil == cases[conditions] {
-                    cases[conditions] = [effect]
+            for edge in state.edges {
+                let targetStateID = try self.store.id(for: edge.target)
+                let targetID = "id\(targetStateID)"
+                let props = self.extract(from: edge.target)
+                let assignments = props.map {
+                    UppaalAssignmentExpression(lhs: $0, rhs: $1)
+                }
+                let assignmentLabel = UppaalAssignmentLabel(assignments: assignments)
+                guard usingClocks else {
+                    let transition = UppaalTransition(
+                        source: sourceID,
+                        target: targetID,
+                        guardLabel: startingCondition.map { UppaalGuardLabel(condition: $0) },
+                        assignmentLabel: assignmentLabel
+                    )
+                    template.transitions.append(transition)
+                    continue
+                }
+                let syncID = sourceID + "sync" + targetID
+                let syncLocation = UppaalLocation(id: syncID, name: UppaalName(name: syncID))
+                template.locations.append(syncLocation)
+                let edgeCondition: UppaalLogicalCondition?
+                if self.usingClocks, let referencingClock = edge.clockName, let constraint = edge.constraint {
+                    let syncCondition = UppaalLogicalCondition(lhs: referencingClock, constraint: constraint)
+                    edgeCondition = startingCondition.map { .and($0, syncCondition) } ?? syncCondition
                 } else {
-                    cases[conditions]?.insert(effect)
+                    edgeCondition = startingCondition
                 }
-            }
-            /*let transition = "TRANS " + conditions + "\n    -> " + effect
-            return transition + ";\n"*/
-        }
-        func combine(label: String) -> (String, Set<String>) -> String? {
-            return { (condition, effects) in
-                let effect = effects.sorted().lazy.map { "(" + $0 + ")" }.combine("") { $0 + "\n    | " + $1  }
-                if effect.isEmpty {
-                    return nil
-                }
-                return label + " " + condition + "\n    -> (" + effect + ");\n"
-            }
-        }
-        let transitions = cases.compactMap(combine(label: "TRANS"))
-        let urgentTransitions = urgentCases.compactMap(combine(label: "URGENT"))
-        let combined = (transitions + urgentTransitions).sorted().combine("") { $0 + "\n" + $1 }
-        return combined.isEmpty ? nil : combined
-    }
-    
-    private func createWaitCase() -> String {
-        let condition = "TRANS c < sync & status != \"finished\""
-        let mandatory = ["next(status) = status"]
-        let extras = self.usingClocks ? ["next(sync) = sync", "next(c) = sync"] : []
-        let clockNames = self.clocks.subtracting(["c"])
-        let fullList = (Array(self.db.propertyNames) + Array(clockNames)) + clockNames.subtracting(["c"]).map { $0 + "-time" }
-        let effects = fullList.sorted().map { "next(" + $0 + ") = " + $0 } + extras + mandatory
-        let effectList = effects.combine("") { $0 + "\n    & " + $1 }
-        return condition + "\n    -> " + effectList + ";"
-    }
-    
-    private func createFinishCase() -> String {
-        let condition = "TRANS status = \"finished\""
-        let mandatory = ["next(status) = status"]
-        let extras = self.usingClocks ? ["next(sync) = sync", "next(c) = c"] : []
-        let clockNames = self.clocks.subtracting(["c"])
-        let fullList = (Array(self.db.propertyNames) + Array(clockNames)) + clockNames.subtracting(["c"]).map { $0 + "-time" }
-        let effects = fullList.sorted().map { "next(" + $0 + ") = " + $0 } + extras + mandatory
-        let effectList = effects.combine("") { $0 + "\n    & " + $1 }
-        return condition + "\n    -> " + effectList + ";"
-    }
-    
-    private func createAcceptingTansition(for props: [String: String]) -> String {
-        let condition = self.createConditions(of: props)
-        let effect = self.createAcceptingEffect(for: props)
-        return "TRANS " + condition + "\n    -> " + effect + ";"
-    }
-    
-    private func createAcceptingEffect(for props: [String: String]) -> String {
-        var targetProps = Dictionary<String, String>(minimumCapacity: props.count + self.clocks.count)
-        props.forEach {
-            targetProps[$0.0] = $0.0
-        }
-        if self.usingClocks {
-            targetProps["c"] = "c"
-            self.clocks.lazy.filter { $0 != "c" }.forEach {
-                targetProps[$0] = $0
-                targetProps[$0 + "-time"] = $0 + "-time"
+                let syncTransition = UppaalTransition(
+                    source: sourceID,
+                    target: syncID,
+                    guardLabel: edgeCondition.map { UppaalGuardLabel(condition: $0) },
+                    assignmentLabel: assignmentLabel
+                )
+                template.transitions.append(syncTransition)
+                let templateGuard = UppaalGuardLabel(condition: .equal("sync", "\(edge.time)"))
+                let templateAssignment = UppaalAssignmentLabel(assignments: [
+                    UppaalAssignmentExpression(lhs: "sync", rhs: "0")
+                ])
+                let transition = UppaalTransition(
+                    source: syncID,
+                    target: targetID,
+                    guardLabel: templateGuard,
+                    assignmentLabel: templateAssignment
+                )
+                template.transitions.append(transition)
             }
         }
-        targetProps["status"] = "\"finished\""
-        return self.createEffect(from: targetProps)
     }
 
-    fileprivate func createConditions(of props: [String: String], constraints: [String: ClockConstraint] = [:], combine: (String, String) -> String = { $0 + " & " + $1 }) -> String {
-        var props = props
-        if self.usingClocks, nil == props["c"] {
-            props["c"] = "sync"
-        }
-        if nil == props["status"] {
-            props["status"] = "\"executing\""
-        }
-        let propValues = props.sorted { $0.key <= $1.key }.map { $0 + " = " + $1 }
-        let constraintValues = constraints.sorted { $0.key <= $1.key }.map { "(" + self.expression(for: $1.reduced, referencing: $0) + ")" }
-        return (propValues + constraintValues).combine("", combine)
-    }
-    
-    private func expression(for constraint: ClockConstraint, referencing label: String) -> String {
-        return constraint.expression(referencing: label, equal: { $0 + "=" + $1 }, and: { $0 + " & " + $1 }, or: { $0 + " | " + $1 })
-    }
+    // fileprivate func createTransitions(
+    //     writingTo outputStream: inout TextOutputStream
+    // ) throws {
+    //     let cases = try self.store.states.lazy.compactMap { (state) -> String? in
+    //         guard let content = self.createCase(of: state) else {
+    //             return nil
+    //         }
+    //         return content
+    //     }
+    //     for str in cases.sorted() {
+    //         outputStream.write(str)
+    //         outputStream.write("\n")
+    //     }
+    //     try self.store.acceptingStates.forEach {
+    //         let props = self.extract(from: $0.properties)
+    //         let conditions = self.createAcceptingTansition(for: props)
+    //         outputStream.write(conditions + "\n\n")
+    //     }
+    //     if self.usingClocks {
+    //         outputStream.write(self.createWaitCase() + "\n\n")
+    //     }
+    //     outputStream.write(self.createFinishCase() + "\n\n")
+    //     outputStream.write("TRANS status = \"error\" -> next(status) = \"error\";\n\n")
+    // }
 
-    fileprivate func createEffect(from props: [String: String], clockName: String? = nil, resetClock: Bool = false, duration: UInt? = nil, readTime: Bool = false, forcePC: String? = nil) -> String {
-        var props = props
-        if nil == props["status"] {
-            props["status"] = "\"executing\""
-        }
-        if self.usingClocks {
-            if nil == props["c"] {
-                props["c"] = "0"
-            }
-            if let rawClockName = clockName {
-                let clockName = self.convert(label: rawClockName)
-                if resetClock {
-                    props[clockName + "-time"] = "0"
-                }
-                if readTime {
-                    props[clockName] = resetClock ? "0" : clockName + "-time"
-                }
-            }
-            if let duration = duration {
-                props["sync"] = "\(duration)"
-            } else {
-                props["sync"] = props["sync"] ?? "sync"
-            }
-        }
-        let allKeys: Set<String>
-        if self.usingClocks {
-            allKeys = Set(self.db.propertyNames).union(self.clocks).union(Set(self.clocks.lazy.filter { $0 != "c" }.map { $0 + "-time" }))
-        } else {
-            allKeys = Set(self.db.propertyNames)
-        }
-        let missingKeys = allKeys.subtracting(Set(props.keys))
-        missingKeys.forEach {
-            props[$0] = $0
-        }
-        return props.sorted { $0.key <= $1.key }.lazy.map {
-            if let newPC = forcePC, $0.key == "pc" {
-                return "next(pc)=" + newPC
-            }
-            return "next(" + $0.key + ")=" + $0.value
-        }.combine("") { $0 + "\n    & " + $1}
-    }
+    // fileprivate func createCase(of state: KripkeState) -> String? {
+    //     if state.edges.isEmpty {
+    //         return nil
+    //     }
+    //     var cases: [String: Set<String>] = [:]
+    //     cases.reserveCapacity(state.edges.count)
+    //     var urgentCases: [String: Set<String>] = [:]
+    //     urgentCases.reserveCapacity(state.edges.count)
+    //     let sourceProps = self.extract(from: state.properties)
+    //     state.edges.forEach { edge in
+    //         var constraints: [String: ClockConstraint] = [:]
+    //         if self.usingClocks, let referencingClock = edge.clockName, let constraint = edge.constraint {
+    //             let clockName = self.convert(label: referencingClock)
+    //             constraints[clockName] = constraint
+    //         }
+            
+    //         let targetProps = self.extract(from: edge.target)
+    //         var newCases: [String: String] = [:]
+    //         newCases.reserveCapacity(2)
+    //         if self.usingClocks {
+    //             var sourceProps = sourceProps
+    //             sourceProps["status"] = "\"executing\""
+    //             let conditions = self.createConditions(of: sourceProps, constraints: constraints)
+    //             newCases[conditions] = self.createEffect(from: ["status": "\"waiting\""], duration: edge.time)
+    //             sourceProps["status"] = "\"waiting\""
+    //             let executingCondition = self.createConditions(of: sourceProps, constraints: constraints)
+    //             var targetProps = targetProps
+    //             targetProps["c"] = "0"
+    //             targetProps["sync"] = "0"
+    //             targetProps["status"] = "\"executing\""
+    //             newCases[executingCondition] = self.createEffect(from: targetProps, clockName: edge.clockName, resetClock: edge.resetClock, readTime: edge.takeSnapshot)
+    //         } else {
+    //             let conditions = self.createConditions(of: sourceProps, constraints: constraints)
+    //             newCases[conditions] = self.createEffect(from: targetProps)
+    //         }
+    //         for (conditions, effect) in newCases {
+    //             if nil == cases[conditions] {
+    //                 cases[conditions] = [effect]
+    //             } else {
+    //                 cases[conditions]?.insert(effect)
+    //             }
+    //         }
+    //         /*let transition = "TRANS " + conditions + "\n    -> " + effect
+    //         return transition + ";\n"*/
+    //     }
+    //     func combine(label: String) -> (String, Set<String>) -> String? {
+    //         return { (condition, effects) in
+    //             let effect = effects.sorted().lazy.map { "(" + $0 + ")" }.combine("") { $0 + "\n    | " + $1  }
+    //             if effect.isEmpty {
+    //                 return nil
+    //             }
+    //             return label + " " + condition + "\n    -> (" + effect + ");\n"
+    //         }
+    //     }
+    //     let transitions = cases.compactMap(combine(label: "TRANS"))
+    //     let urgentTransitions = urgentCases.compactMap(combine(label: "URGENT"))
+    //     let combined = (transitions + urgentTransitions).sorted().combine("") { $0 + "\n" + $1 }
+    //     return combined.isEmpty ? nil : combined
+    // }
+    
+    // private func createWaitCase() -> String {
+    //     let condition = "TRANS c < sync & status != \"finished\""
+    //     let mandatory = ["next(status) = status"]
+    //     let extras = self.usingClocks ? ["next(sync) = sync", "next(c) = sync"] : []
+    //     let clockNames = self.clocks.subtracting(["c"])
+    //     let fullList = (Array(self.db.propertyNames) + Array(clockNames)) + clockNames.subtracting(["c"]).map { $0 + "-time" }
+    //     let effects = fullList.sorted().map { "next(" + $0 + ") = " + $0 } + extras + mandatory
+    //     let effectList = effects.combine("") { $0 + "\n    & " + $1 }
+    //     return condition + "\n    -> " + effectList + ";"
+    // }
+    
+    // private func createFinishCase() -> String {
+    //     let condition = "TRANS status = \"finished\""
+    //     let mandatory = ["next(status) = status"]
+    //     let extras = self.usingClocks ? ["next(sync) = sync", "next(c) = c"] : []
+    //     let clockNames = self.clocks.subtracting(["c"])
+    //     let fullList = (Array(self.db.propertyNames) + Array(clockNames)) + clockNames.subtracting(["c"]).map { $0 + "-time" }
+    //     let effects = fullList.sorted().map { "next(" + $0 + ") = " + $0 } + extras + mandatory
+    //     let effectList = effects.combine("") { $0 + "\n    & " + $1 }
+    //     return condition + "\n    -> " + effectList + ";"
+    // }
+    
+    // private func createAcceptingTansition(for props: [String: String]) -> String {
+    //     let condition = self.createConditions(of: props)
+    //     let effect = self.createAcceptingEffect(for: props)
+    //     return "TRANS " + condition + "\n    -> " + effect + ";"
+    // }
+    
+    // private func createAcceptingEffect(for props: [String: String]) -> String {
+    //     var targetProps = Dictionary<String, String>(minimumCapacity: props.count + self.clocks.count)
+    //     props.forEach {
+    //         targetProps[$0.0] = $0.0
+    //     }
+    //     if self.usingClocks {
+    //         targetProps["c"] = "c"
+    //         self.clocks.lazy.filter { $0 != "c" }.forEach {
+    //             targetProps[$0] = $0
+    //             targetProps[$0 + "-time"] = $0 + "-time"
+    //         }
+    //     }
+    //     targetProps["status"] = "\"finished\""
+    //     return self.createEffect(from: targetProps)
+    // }
+
+    // fileprivate func createConditions(of props: [String: String], constraints: [String: ClockConstraint] = [:], combine: (String, String) -> String = { $0 + " & " + $1 }) -> String {
+    //     var props = props
+    //     if self.usingClocks, nil == props["c"] {
+    //         props["c"] = "sync"
+    //     }
+    //     if nil == props["status"] {
+    //         props["status"] = "\"executing\""
+    //     }
+    //     let propValues = props.sorted { $0.key <= $1.key }.map { $0 + " = " + $1 }
+    //     let constraintValues = constraints.sorted { $0.key <= $1.key }.map { "(" + self.expression(for: $1.reduced, referencing: $0) + ")" }
+    //     return (propValues + constraintValues).combine("", combine)
+    // }
+    
+    // private func expression(for constraint: ClockConstraint, referencing label: String) -> String {
+    //     return constraint.expression(referencing: label, equal: { $0 + "=" + $1 }, and: { $0 + " & " + $1 }, or: { $0 + " | " + $1 })
+    // }
+
+    // fileprivate func createEffect(from props: [String: String], clockName: String? = nil, resetClock: Bool = false, duration: UInt? = nil, readTime: Bool = false, forcePC: String? = nil) -> String {
+    //     var props = props
+    //     if nil == props["status"] {
+    //         props["status"] = "\"executing\""
+    //     }
+    //     if self.usingClocks {
+    //         if nil == props["c"] {
+    //             props["c"] = "0"
+    //         }
+    //         if let rawClockName = clockName {
+    //             let clockName = self.convert(label: rawClockName)
+    //             if resetClock {
+    //                 props[clockName + "-time"] = "0"
+    //             }
+    //             if readTime {
+    //                 props[clockName] = resetClock ? "0" : clockName + "-time"
+    //             }
+    //         }
+    //         if let duration = duration {
+    //             props["sync"] = "\(duration)"
+    //         } else {
+    //             props["sync"] = props["sync"] ?? "sync"
+    //         }
+    //     }
+    //     let allKeys: Set<String>
+    //     if self.usingClocks {
+    //         allKeys = Set(self.db.propertyNames).union(self.clocks).union(Set(self.clocks.lazy.filter { $0 != "c" }.map { $0 + "-time" }))
+    //     } else {
+    //         allKeys = Set(self.db.propertyNames)
+    //     }
+    //     let missingKeys = allKeys.subtracting(Set(props.keys))
+    //     missingKeys.forEach {
+    //         props[$0] = $0
+    //     }
+    //     return props.sorted { $0.key <= $1.key }.lazy.map {
+    //         if let newPC = forcePC, $0.key == "pc" {
+    //             return "next(pc)=" + newPC
+    //         }
+    //         return "next(" + $0.key + ")=" + $0.value
+    //     }.combine("") { $0 + "\n    & " + $1}
+    // }
 
     private func convert(label: String) -> String {
         guard let first = label.first else {

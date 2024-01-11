@@ -47,7 +47,7 @@ class KripkeStructureViewTestCase: XCTestCase {
                 )
             ),
             KripkeState(
-                isInitial: true,
+                isInitial: false,
                 properties: KripkeStatePropertyList(
                     properties: [
                         "value": KripkeStateProperty(type: .Bool, value: true as Any)
