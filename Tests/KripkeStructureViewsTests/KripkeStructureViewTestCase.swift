@@ -68,7 +68,7 @@ class KripkeStructureViewTestCase: XCTestCase {
         states[1].addEdge(
             KripkeEdge(
                 clockName: "c0",
-                constraint: .lessThanEqual(value: 3),
+                constraint: .lessThanEqual(value: 10),
                 resetClock: true,
                 takeSnapshot: true,
                 time: 5,
@@ -200,6 +200,48 @@ class KripkeStructureViewTestCase: XCTestCase {
                         friends: [Friend(name: "Bob", age: 18)],
                         bestFriend: Friend(name: "Bob", age: 18)
                     )
+                )
+            )
+        ]
+        states[0].addEdge(
+            KripkeEdge(
+                clockName: "c0",
+                constraint: .lessThanEqual(value: 3),
+                resetClock: true,
+                takeSnapshot: true,
+                time: 5,
+                target: states[1].properties
+            )
+        )
+        states[1].addEdge(
+            KripkeEdge(
+                clockName: "c0",
+                constraint: .lessThanEqual(value: 10),
+                resetClock: true,
+                takeSnapshot: true,
+                time: 5,
+                target: states[0].properties
+            )
+        )
+        return try InMemoryKripkeStructure(identifier: identifier, states: states)
+    }
+
+    func strStructure(_ identifier: String) throws -> InMemoryKripkeStructure {
+        let states = [
+            KripkeState(
+                isInitial: true,
+                properties: KripkeStatePropertyList(
+                    properties: [
+                        "value": KripkeStateProperty(type: .String, value: "Hello" as Any)
+                    ]
+                )
+            ),
+            KripkeState(
+                isInitial: false,
+                properties: KripkeStatePropertyList(
+                    properties: [
+                        "value": KripkeStateProperty(type: .String, value: "World!" as Any)
+                    ]
                 )
             )
         ]
