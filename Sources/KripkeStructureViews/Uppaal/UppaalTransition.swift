@@ -4,11 +4,21 @@ struct UppaalTransition: Hashable, Codable, Sendable {
 
     var target: String
 
-    var guardLabel: String
+    var guardLabel: UppaalGuardLabel?
 
-    var assignmentLabel: String
+    var assignmentLabel: UppaalAssignmentLabel?
 
-    init(source: String, target: String, guardLabel: String = "", assignmentLabel: String = "") {
+    var modelRepresentation: String {
+        // swiftlint:disable:next line_length
+        "<transition><source ref=\"\(source)\"/><target ref=\"\(target)\"/>\(guardLabel?.modelRepresentation ?? "")\(assignmentLabel?.modelRepresentation ?? "")</transition>"
+    }
+
+    init(
+        source: String,
+        target: String,
+        guardLabel: UppaalGuardLabel? = nil,
+        assignmentLabel: UppaalAssignmentLabel? = nil
+    ) {
         self.source = source
         self.target = target
         self.guardLabel = guardLabel
