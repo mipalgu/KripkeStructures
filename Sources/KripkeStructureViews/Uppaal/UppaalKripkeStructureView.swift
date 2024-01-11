@@ -21,6 +21,22 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
 
     private var store: KripkeStructure! = nil
 
+    private var typedefs: [String: UppaalType] = [:]
+
+    private var typedefDeclarations: String {
+        typedefs.sorted { $0.key < $1.key }.compactMap { (key, type) in
+            UppaalType.typedef(key).typedefDeclaration(aliasing: type)
+        }.joined(separator: "\n\n")
+    }
+
+    private var clockDeclarations: String {
+        clocks.map { UppaalType.clock.variableDeclaration(label: $0) }.joined(separator: "\n")
+    }
+
+    private var globalDeclarations: String {
+        return [typedefDeclarations, clockDeclarations].lazy.filter { !$0.isEmpty }.joined(separator: "\n\n")
+    }
+
     public init(
         identifier: String,
         outputStreamFactory: OutputStreamFactory = FileOutputStreamFactory()
@@ -36,10 +52,14 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
     }
 
     private func reset(usingClocks: Bool) throws {
-        self.clocks = ["c"]
         self.usingClocks = usingClocks
+        self.clocks.removeAll(keepingCapacity: true)
+        if usingClocks {
+            self.clocks.insert("syn")
+        }
         self.stream = self.outputStreamFactory.make(id: self.identifier + ".xml")
         self.store = nil
+        self.typedefs.removeAll(keepingCapacity: true)
     }
 
     private func finish() throws {
@@ -49,7 +69,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         try self.createInitial(&template)
         try self.createLocations(&template)
         try self.createTransitions(&template)
-        let model = UppaalModel(globalDeclarations: "", templates: [template])
+        let model = UppaalModel(globalDeclarations: globalDeclarations, templates: [template])
         self.stream.write(model.modelRepresentation)
         self.stream.flush()
     }
@@ -193,34 +213,41 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         let preLabel = prepend.map { $0 + "." } ?? ""
         list.forEach { (key, property) in
             let label = self.convert(label: preLabel + key)
-            self.convert(property, properties: properties, label: label)
+            self.convert(property, properties: properties, label: label, key: label)
         }
     }
 
-    fileprivate func convert(_ property: KripkeStateProperty, properties: Ref<[String: String]>, label: String) {
+    @discardableResult
+    fileprivate func convert(
+        _ property: KripkeStateProperty,
+        properties: Ref<[String: String]>,
+        label: String,
+        key: String
+    ) -> UppaalType {
         switch property.type {
         case .Bool:
             properties.value[label] = "\(property.value as! Bool)"
+            return .bool
         case .Int:
-            self.convert(integer: property.value as! Int, properties: properties, label: label)
+            return convert(integer: property.value as! Int, properties: properties, label: label, key: key)
         case .Int8:
-            self.convert(integer: property.value as! Int8, properties: properties, label: label)
+            return convert(integer: property.value as! Int8, properties: properties, label: label, key: key)
         case .Int16:
-            self.convert(integer: property.value as! Int16, properties: properties, label: label)
+            return convert(integer: property.value as! Int16, properties: properties, label: label, key: key)
         case .Int32:
-            self.convert(integer: property.value as! Int32, properties: properties, label: label)
+            return convert(integer: property.value as! Int32, properties: properties, label: label, key: key)
         case .Int64:
-            self.convert(integer: property.value as! Int64, properties: properties, label: label)
+            return convert(integer: property.value as! Int64, properties: properties, label: label, key: key)
         case .UInt:
-            self.convert(integer: property.value as! UInt, properties: properties, label: label)
+            return convert(integer: property.value as! UInt, properties: properties, label: label, key: key)
         case .UInt8:
-            self.convert(integer: property.value as! UInt8, properties: properties, label: label)
+            return convert(integer: property.value as! UInt8, properties: properties, label: label, key: key)
         case .UInt16:
-            self.convert(integer: property.value as! UInt16, properties: properties, label: label)
+            return convert(integer: property.value as! UInt16, properties: properties, label: label, key: key)
         case .UInt32:
-            self.convert(integer: property.value as! UInt32, properties: properties, label: label)
+            return convert(integer: property.value as! UInt32, properties: properties, label: label, key: key)
         case .UInt64:
-            self.convert(integer: property.value as! UInt64, properties: properties, label: label)
+            return convert(integer: property.value as! UInt64, properties: properties, label: label, key: key)
         case .Float, .Double:
             fatalError("Floats and Doubles are not yet implemented.")
 #if (arch(i386) || arch(x86_64)) && !os(Windows) && !os(Android)
@@ -232,11 +259,18 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
             let cString = Array(str.utf8CString)
             let props = cString.map { KripkeStateProperty(type: .Int8, value: Int8($0)) }
             let collection = KripkeStateProperty(type: .Collection(props), value: props)
-            self.convert(collection, properties: properties, label: label)
+            self.convert(collection, properties: properties, label: label, key: key)
+            let typedef = key + "_str"
+            if case .array(let innerType, let count) = typedefs[typedef], innerType == .int {
+                typedefs[typedef] = .array(.int, max(count, cString.count))
+            } else {
+                typedefs[typedef] = .array(.int, cString.count)
+            }
+            return .typedef(typedef)
         case .Optional(let property):
             switch property {
             case .none:
-                self.convert(
+                return self.convert(
                     KripkeStateProperty(
                         type: .Compound(
                             KripkeStatePropertyList(properties: [
@@ -246,10 +280,11 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                         value: ["hasValue": false as Any]
                     ),
                     properties: properties,
-                    label: label
+                    label: label,
+                    key: key
                 )
             case .some(let prop):
-                self.convert(
+                return self.convert(
                     KripkeStateProperty(
                         type: .Compound(
                             KripkeStatePropertyList(properties: [
@@ -263,57 +298,103 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                         ]
                     ),
                     properties: properties,
-                    label: label
+                    label: label,
+                    key: key
                 )
             }
         case .EmptyCollection:
-            return
+            return .typedef(key + "_arr")
         case .Collection(let props):
+            var elementType: UppaalType?
             for (index, property) in props.enumerated() {
-                self.convert(
+                let newType = self.convert(
                     property,
                     properties: properties,
-                    label: label + "[\(index)]"
+                    label: label + "[\(index)]",
+                    key: key + "_\(index)"
                 )
+                if let oldType = elementType {
+                    guard newType == oldType else {
+                        fatalError("Multiple types in array not supported.")
+                    }
+                } else {
+                    elementType = newType
+                }
             }
+            let typedef = key + "_arr"
+            guard let elementType = elementType else {
+                return .typedef(typedef)
+            }
+            if case .array(let innerType, let count) = typedefs[typedef] {
+                guard innerType == elementType else {
+                    fatalError("Multiple types in array not supported.")
+                }
+                typedefs[typedef] = .array(elementType, max(count, props.count))
+            } else {
+                typedefs[typedef] = .array(elementType, props.count)
+            }
+            return .typedef(typedef)
         case .Compound(let list):
-            self.convert(list, properties: properties, prepend: label)
+            let types = Dictionary(
+                uniqueKeysWithValues: list.map { (keyLabel, property) in
+                    let sanitisedKey = self.convert(label: keyLabel)
+                    let label = label + "_" + sanitisedKey
+                    let key = key + "_" + sanitisedKey
+                    return (label, self.convert(property, properties: properties, label: label, key: key))
+                }
+            )
+            let typedef = key + "_record"
+            guard case .record(let name, let oldTypes) = typedefs[typedef], name == typedef else {
+                typedefs[typedef] = .record(typedef, types)
+                return .typedef(typedef)
+            }
+            let mergedTypes = oldTypes.merging(types) { $1 }
+            typedefs[typedef] = .record(typedef, mergedTypes)
+            return .typedef(typedef)
         }
     }
 
     private func convert<I: SignedInteger>(
         integer value: I,
         properties: Ref<[String: String]>,
-        label: String
-    ) {
+        label: String,
+        key: String
+    ) -> UppaalType {
         if MemoryLayout<I>.size <= 4 {
             properties.value[label] = "\(properties.value)"
+            return .int
         } else {
             guard let value = Int(exactly: value) else {
                 fatalError("Cannot encapsulate value '\(value)' within an Int.")
             }
             let bitPattern = UInt(bitPattern: value)
-            self.convert(bitPattern: bitPattern, properties: properties, label: label)
+            return convert(bitPattern: bitPattern, properties: properties, label: label, key: key)
         }
     }
 
     private func convert<I: UnsignedInteger>(
         integer value: I,
         properties: Ref<[String: String]>,
-        label: String
-    ) {
+        label: String,
+        key: String
+    ) -> UppaalType {
         if MemoryLayout<I>.size < 4 {
             properties.value[label] = "\(properties.value)"
-            return
+            return .int
         } else {
             guard let bitPattern = UInt(exactly: value) else {
                 fatalError("Cannot encapsulate value '\(value)' within a UInt.")
             }
-            self.convert(bitPattern: bitPattern, properties: properties, label: label)
+            return self.convert(bitPattern: bitPattern, properties: properties, label: label, key: key)
         }
     }
 
-    private func convert(bitPattern: UInt, properties: Ref<[String: String]>, label: String) {
+    private func convert(
+        bitPattern: UInt,
+        properties: Ref<[String: String]>,
+        label: String,
+        key: String
+    ) -> UppaalType {
         let totalBytes = MemoryLayout<Int>.size
         var dict: [String: UInt8] = [:]
         dict.reserveCapacity(totalBytes)
@@ -323,13 +404,14 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         let plist = KripkeStatePropertyList(
             properties: dict.mapValues { KripkeStateProperty(type: .UInt8, value: $0) }
         )
-        self.convert(
+        return self.convert(
             KripkeStateProperty(
                 type: .Compound(plist),
                 value: dict
             ),
             properties: properties,
-            label: label
+            label: label,
+            key: key
         )
     }
 
