@@ -62,7 +62,7 @@ enum UppaalType: Hashable, Codable, Sendable {
             }
             return pre + type + " " + label + ";"
         case .record(_, let types):
-            let variableDeclarations = types.compactMap {
+            let variableDeclarations = types.sorted { $0.key < $1.key }.compactMap {
                 guard
                     let declaration = $1.variableDeclaration(
                         label: $0,
@@ -99,7 +99,7 @@ enum UppaalType: Hashable, Codable, Sendable {
             }
             return pre + "typedef " + name + " " + label + ";"
         case .record(_, let types):
-            let variableDeclarations = types.compactMap {
+            let variableDeclarations = types.sorted { $0.key < $1.key }.compactMap {
                 $1.variableDeclaration(label: $0, prefix: pre + "  ", includeTypedef: includeTypedef).map {
                     pre + $0
                 }

@@ -32,7 +32,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
     }
 
     private var clockDeclarations: String {
-        clocks.compactMap { UppaalType.clock.variableDeclaration(label: $0) }.joined(separator: "\n")
+        clocks.sorted().compactMap { UppaalType.clock.variableDeclaration(label: $0) }.joined(separator: "\n")
     }
 
     private var globalDeclarations: String {
@@ -246,7 +246,8 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         _ property: KripkeStateProperty,
         properties: Ref<[String: String]>,
         label: String,
-        key: String
+        key: String,
+        collapseArray: Bool = false
     ) -> UppaalType {
         switch property.type {
         case .Bool:
@@ -283,17 +284,9 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
             let cString = Array(str.utf8CString)
             let props = cString.map { KripkeStateProperty(type: .Int8, value: Int8($0)) }
             let collection = KripkeStateProperty(type: .Collection(props), value: props)
-            _ = self.convert(collection, properties: properties, label: label, key: key)
-            let typedef = key + "_s"
-            if case .array(let innerType, let count) = typedefs[typedef], innerType == .int {
-                typedefs[typedef] = .array(.int, max(count, cString.count))
-            } else {
-                typedefs[typedef] = .array(.int, cString.count)
-            }
-            return .typedef(typedef)
+            return self.convert(collection, properties: properties, label: label, key: key)
         case .Optional(let property):
-            switch property {
-            case .none:
+            guard let property = property else {
                 return self.convert(
                     KripkeStateProperty(
                         type: .Compound(
@@ -307,28 +300,47 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                     label: label,
                     key: key
                 )
-            case .some(let prop):
+            }
+            return self.convert(
+                KripkeStateProperty(
+                    type: .Compound(
+                        KripkeStatePropertyList(properties: [
+                            "hasValue": KripkeStateProperty(type: .Bool, value: true as Any),
+                            "value": property
+                        ])
+                    ),
+                    value: [
+                        "hasValue": true as Any,
+                        "value": property.value
+                    ]
+                ),
+                properties: properties,
+                label: label,
+                key: key
+            )
+        case .EmptyCollection:
+            return .typedef(key + "_a")
+        case .Collection(let props):
+            guard collapseArray else {
                 return self.convert(
                     KripkeStateProperty(
                         type: .Compound(
                             KripkeStatePropertyList(properties: [
-                                "hasValue": KripkeStateProperty(type: .Bool, value: true as Any),
-                                "value": prop
+                                "count": KripkeStateProperty(type: .Int32, value: Int32(props.count)),
+                                "value": property
                             ])
                         ),
                         value: [
-                            "hasValue": true as Any,
-                            "value": prop.value
+                            "count": Int32(props.count) as Any,
+                            "value": property.value
                         ]
                     ),
                     properties: properties,
                     label: label,
-                    key: key
+                    key: key,
+                    collapseArray: true
                 )
             }
-        case .EmptyCollection:
-            return .typedef(key + "_a")
-        case .Collection(let props):
             var elementType: UppaalType?
             for (index, property) in props.enumerated() {
                 let newType = self.convert(
@@ -364,7 +376,16 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                     let sanitisedKey = self.convert(label: keyLabel)
                     let label = label + "." + sanitisedKey
                     let key = key + "_" + sanitisedKey
-                    return (sanitisedKey, self.convert(property, properties: properties, label: label, key: key))
+                    return (
+                        sanitisedKey,
+                        self.convert(
+                            property,
+                            properties: properties,
+                            label: label,
+                            key: key,
+                            collapseArray: collapseArray
+                        )
+                    )
                 }
             )
             let typedef = key + "_t"
