@@ -143,8 +143,8 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                 let assignments = props.map {
                     UppaalAssignmentExpression(lhs: $0, rhs: $1)
                 }
-                let assignmentLabel = UppaalAssignmentLabel(assignments: assignments)
                 guard usingClocks else {
+                    let assignmentLabel = UppaalAssignmentLabel(assignments: assignments)
                     let transition = UppaalTransition(
                         source: sourceID,
                         target: targetID,
@@ -154,8 +154,15 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                     template.transitions.append(transition)
                     continue
                 }
+                let assignmentLabel = UppaalAssignmentLabel(
+                    assignments: assignments + [UppaalAssignmentExpression(lhs: "syn", rhs: "0")]
+                )
                 let syncID = sourceID + "sync" + targetID
-                let syncLocation = UppaalLocation(id: syncID, name: UppaalName(name: syncID))
+                let syncLocation = UppaalLocation(
+                    id: syncID,
+                    name: UppaalName(name: syncID),
+                    invariant: UppaalInvariantLabel(condition: .lessThanEqual("syn", "\(edge.time)"))
+                )
                 template.locations.append(syncLocation)
                 let edgeCondition: UppaalLogicalCondition?
                 if self.usingClocks, let referencingClock = edge.clockName, let constraint = edge.constraint {
