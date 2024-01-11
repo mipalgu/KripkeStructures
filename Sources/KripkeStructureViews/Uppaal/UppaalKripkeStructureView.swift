@@ -23,6 +23,8 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
 
     private var typedefs: [String: UppaalType] = [:]
 
+    private var variables: [String: UppaalType] = [:]
+
     private var typedefDeclarations: String {
         typedefs.sorted { $0.key < $1.key }.compactMap { (key, type) in
             UppaalType.typedef(key).typedefDeclaration(aliasing: type)
@@ -34,7 +36,14 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
     }
 
     private var globalDeclarations: String {
-        return [typedefDeclarations, clockDeclarations].lazy.filter { !$0.isEmpty }.joined(separator: "\n\n")
+        return [typedefDeclarations, clockDeclarations, variableDeclarations]
+            .lazy
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+    }
+
+    private var variableDeclarations: String {
+        variables.sorted { $0.key < $1.key }.map { $1.variableDeclaration(label: $0) }.joined(separator: "\n")
     }
 
     public init(
@@ -60,6 +69,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         self.stream = self.outputStreamFactory.make(id: self.identifier + ".xml")
         self.store = nil
         self.typedefs.removeAll(keepingCapacity: true)
+        self.variables.removeAll(keepingCapacity: true)
     }
 
     private func finish() throws {
@@ -145,6 +155,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                 template.locations.append(syncLocation)
                 let edgeCondition: UppaalLogicalCondition?
                 if self.usingClocks, let referencingClock = edge.clockName, let constraint = edge.constraint {
+                    clocks.insert(referencingClock)
                     let syncCondition = UppaalLogicalCondition(lhs: referencingClock, constraint: constraint)
                     edgeCondition = startingCondition.map { .and($0, syncCondition) } ?? syncCondition
                 } else {
@@ -213,11 +224,11 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         let preLabel = prepend.map { $0 + "." } ?? ""
         list.forEach { (key, property) in
             let label = self.convert(label: preLabel + key)
-            self.convert(property, properties: properties, label: label, key: label)
+            let type = self.convert(property, properties: properties, label: label, key: label)
+            variables[label] = type
         }
     }
 
-    @discardableResult
     fileprivate func convert(
         _ property: KripkeStateProperty,
         properties: Ref<[String: String]>,
