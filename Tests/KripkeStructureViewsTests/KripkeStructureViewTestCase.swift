@@ -16,44 +16,6 @@ class KripkeStructureViewTestCase: XCTestCase {
 
     var testFolder: URL!
 
-    var simpleStructureIdentifier: String {
-        readableName + "-simple"
-    }
-
-    var simpleStructure: InMemoryKripkeStructure {
-        get throws {
-            let states = [
-                KripkeState(
-                    isInitial: true,
-                    properties: KripkeStatePropertyList(
-                        properties: [
-                            "value": KripkeStateProperty(type: .Bool, value: false as Any)
-                        ]
-                    )
-                ),
-                KripkeState(
-                    isInitial: true,
-                    properties: KripkeStatePropertyList(
-                        properties: [
-                            "value": KripkeStateProperty(type: .Bool, value: true as Any)
-                        ]
-                    )
-                )
-            ]
-            states[0].addEdge(
-                KripkeEdge(
-                    clockName: "c0",
-                    constraint: .equal(value: 3),
-                    resetClock: true,
-                    takeSnapshot: true,
-                    time: 5,
-                    target: states[1].properties
-                )
-            )
-            return try InMemoryKripkeStructure(identifier: simpleStructureIdentifier, states: states)
-        }
-    }
-
     override func setUpWithError() throws {
         let fm = FileManager.default
         originalPath = fm.currentDirectoryPath
@@ -72,6 +34,38 @@ class KripkeStructureViewTestCase: XCTestCase {
     override func tearDownWithError() throws {
         let fm = FileManager.default
         fm.changeCurrentDirectoryPath(originalPath)
+    }
+
+    func simpleStructure(_ identifier: String) throws -> InMemoryKripkeStructure {
+        let states = [
+            KripkeState(
+                isInitial: true,
+                properties: KripkeStatePropertyList(
+                    properties: [
+                        "value": KripkeStateProperty(type: .Bool, value: false as Any)
+                    ]
+                )
+            ),
+            KripkeState(
+                isInitial: true,
+                properties: KripkeStatePropertyList(
+                    properties: [
+                        "value": KripkeStateProperty(type: .Bool, value: true as Any)
+                    ]
+                )
+            )
+        ]
+        states[0].addEdge(
+            KripkeEdge(
+                clockName: "c0",
+                constraint: .equal(value: 3),
+                resetClock: true,
+                takeSnapshot: true,
+                time: 5,
+                target: states[1].properties
+            )
+        )
+        return try InMemoryKripkeStructure(identifier: identifier, states: states)
     }
 
 }
