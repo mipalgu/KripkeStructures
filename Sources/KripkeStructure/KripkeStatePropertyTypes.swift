@@ -75,7 +75,7 @@ public enum KripkeStatePropertyTypes: Equatable, Codable {
     case Collection([KripkeStateProperty])
     case Compound(KripkeStatePropertyList)
 
-    var typeString: String {
+    public var typeString: String {
         switch self {
         case .Bool: return "Bool"
         case .Int: return "Int"
@@ -101,7 +101,7 @@ public enum KripkeStatePropertyTypes: Equatable, Codable {
         }
     }
 
-    var isEmptyCompound: Bool {
+    public var isEmptyCompound: Bool {
         switch self {
         case .Compound(let props):
             return !props.properties.contains { !$1.isEmptyCompound }
@@ -110,7 +110,7 @@ public enum KripkeStatePropertyTypes: Equatable, Codable {
         }
     }
 
-    var isEmpty: Bool {
+    public var isEmpty: Bool {
         switch self {
         case .EmptyCollection:
             return true
@@ -125,7 +125,7 @@ public enum KripkeStatePropertyTypes: Equatable, Codable {
         }
     }
 
-    var defaultType: KripkeStatePropertyTypes {
+    public var defaultType: KripkeStatePropertyTypes {
         switch self {
         case .Bool,
             .Int, .Int8, .Int16, .Int32, .Int64,
@@ -147,7 +147,7 @@ public enum KripkeStatePropertyTypes: Equatable, Codable {
         }
     }
 
-    var defaultValue: Any {
+    public var defaultValue: Any {
         switch self {
         case .Bool:
             return false

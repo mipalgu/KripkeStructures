@@ -15,24 +15,24 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
     
     fileprivate var stream: OutputStream!
     
-    private var clocks: Set<String> = Set()
+    private var clocks: Set<String> = Set(minimumCapacity: 100)
     
     private var usingClocks: Bool = false
 
     private var store: KripkeStructure! = nil
 
-    private var typedefs: [String: UppaalType] = [:]
+    private var typedefs: [String: UppaalType] = Dictionary(minimumCapacity: 100)
 
-    private var variables: [String: UppaalType] = [:]
+    private var variables: [String: UppaalType] = Dictionary(minimumCapacity: 100)
 
     private var typedefDeclarations: String {
-        typedefs.sorted { $0.key < $1.key }.compactMap { (key, type) in
-            UppaalType.typedef(key).typedefDeclaration(aliasing: type)
+        typedefs.sorted { $0.key.count > $1.key.count }.compactMap { (key, type) in
+            UppaalType.typedef(key).typedefDeclaration(aliasing: type) { self.typedefs[$0] != nil }
         }.joined(separator: "\n\n")
     }
 
     private var clockDeclarations: String {
-        clocks.map { UppaalType.clock.variableDeclaration(label: $0) }.joined(separator: "\n")
+        clocks.compactMap { UppaalType.clock.variableDeclaration(label: $0) }.joined(separator: "\n")
     }
 
     private var globalDeclarations: String {
@@ -43,7 +43,9 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
     }
 
     private var variableDeclarations: String {
-        variables.sorted { $0.key < $1.key }.map { $1.variableDeclaration(label: $0) }.joined(separator: "\n")
+        variables.sorted { $0.key < $1.key }.compactMap {
+            $1.variableDeclaration(label: $0) { self.typedefs[$0] != nil }
+        }.joined(separator: "\n")
     }
 
     public init(
@@ -282,7 +284,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
             let props = cString.map { KripkeStateProperty(type: .Int8, value: Int8($0)) }
             let collection = KripkeStateProperty(type: .Collection(props), value: props)
             _ = self.convert(collection, properties: properties, label: label, key: key)
-            let typedef = key + "_str"
+            let typedef = key + "_s"
             if case .array(let innerType, let count) = typedefs[typedef], innerType == .int {
                 typedefs[typedef] = .array(.int, max(count, cString.count))
             } else {
@@ -325,7 +327,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                 )
             }
         case .EmptyCollection:
-            return .typedef(key + "_arr")
+            return .typedef(key + "_a")
         case .Collection(let props):
             var elementType: UppaalType?
             for (index, property) in props.enumerated() {
@@ -343,7 +345,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                     elementType = newType
                 }
             }
-            let typedef = key + "_arr"
+            let typedef = key + "_a"
             guard let elementType = elementType else {
                 return .typedef(typedef)
             }
@@ -360,12 +362,12 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
             let types = Dictionary(
                 uniqueKeysWithValues: list.map { (keyLabel, property) in
                     let sanitisedKey = self.convert(label: keyLabel)
-                    let label = label + "_" + sanitisedKey
+                    let label = label + "." + sanitisedKey
                     let key = key + "_" + sanitisedKey
-                    return (label, self.convert(property, properties: properties, label: label, key: key))
+                    return (sanitisedKey, self.convert(property, properties: properties, label: label, key: key))
                 }
             )
-            let typedef = key + "_record"
+            let typedef = key + "_t"
             guard case .record(let name, let oldTypes) = typedefs[typedef], name == typedef else {
                 typedefs[typedef] = .record(typedef, types)
                 return .typedef(typedef)
@@ -383,7 +385,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         key: String
     ) -> UppaalType {
         if MemoryLayout<I>.size <= 4 {
-            properties.value[label] = "\(properties.value)"
+            properties.value[label] = value.description
             return .int
         } else {
             guard let value = Int(exactly: value) else {
@@ -401,7 +403,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         key: String
     ) -> UppaalType {
         if MemoryLayout<I>.size < 4 {
-            properties.value[label] = "\(properties.value)"
+            properties.value[label] = value.description
             return .int
         } else {
             guard let bitPattern = UInt(exactly: value) else {
