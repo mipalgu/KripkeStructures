@@ -6,8 +6,8 @@ import XCTest
 final class UppaalKripkeStructureViewTests: KripkeStructureViewTestCase {
 
     func test_createsViewWithoutCrashing() throws {
-        let view = try UppaalKripkeStructureView(identifier: "simple")
-        try view.generate(store: simpleStructure("simple"), usingClocks: true)
+        let view = try UppaalKripkeStructureView(identifier: "0")
+        try view.generate(store: simpleStructure("0"), usingClocks: true)
     }
 
     func test_createsComplexViewWithoutCrashing() throws {

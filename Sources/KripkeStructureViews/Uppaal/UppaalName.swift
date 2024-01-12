@@ -1,6 +1,17 @@
+import Foundation
+
 struct UppaalName: Hashable, Codable, Sendable, ExpressibleByStringLiteral {
 
-    var name: String
+    private var actualName: String
+
+    var name: String {
+        get {
+            actualName
+        } set {
+            let name = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            actualName = (name.isEmpty || (name.first?.isLetter).map({ !$0 }) ?? true) ? "l" + name : name
+        }
+    }
 
     var x: Int
 
@@ -15,7 +26,8 @@ struct UppaalName: Hashable, Codable, Sendable, ExpressibleByStringLiteral {
     }
 
     init(name: String, x: Int = 0, y: Int = 0) {
-        self.name = name
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.actualName = (name.isEmpty || (name.first?.isLetter).map({ !$0 }) ?? true) ? "l" + name : name
         self.x = x
         self.y = y
     }
