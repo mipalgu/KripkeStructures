@@ -53,7 +53,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
     public init(
         identifier: String,
         outputStreamFactory: OutputStreamFactory = FileOutputStreamFactory()
-    ) throws {
+    ) {
         self.identifier = identifier
         self.outputStreamFactory = outputStreamFactory
     }
