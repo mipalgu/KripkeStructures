@@ -1,4 +1,5 @@
 import IO
+import Graphs
 import KripkeStructure
 
 #if os(macOS)
@@ -84,6 +85,8 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         try self.createInitial(&template)
         try self.createLocations(&template)
         try self.createTransitions(&template)
+        template.layout(times: 10, gravityConstant: Point2D(-10))
+        template.adjustLabels()
         let model = UppaalModel(globalDeclarations: globalDeclarations, templates: [template])
         self.stream.write(model.modelRepresentation)
         self.stream.flush()
@@ -92,7 +95,8 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
     private func createInitial(_ template: inout UppaalTemplate) throws {
         let id = "initial"
         template.initialLocation = id
-        template.locations.append(UppaalLocation(id: id, name: UppaalName(name: id), type: .committed))
+        let location = UppaalLocation(id: id, name: UppaalName(name: id), type: .committed)
+        template.locations[location.id] = location
         if try nil == self.store.initialStates.first(where: { _ in true }) {
             return
         }
@@ -122,7 +126,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                 name: UppaalName(name: id),
                 type: usingClocks ? .committed : .normal
             )
-            template.locations.append(location)
+            template.locations[location.id] = location
         }
     }
 
@@ -169,7 +173,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
                     name: UppaalName(name: syncID),
                     invariant: UppaalInvariantLabel(condition: .lessThanEqual("syn", "\(edge.time)"))
                 )
-                template.locations.append(syncLocation)
+                template.locations[syncLocation.id] = syncLocation
                 let edgeCondition: UppaalLogicalCondition?
                 if self.usingClocks, let referencingClock = edge.clockName, let constraint = edge.constraint {
                     clocks.insert(referencingClock)

@@ -1,4 +1,6 @@
-struct UppaalLocation: Hashable, Codable, Sendable {
+import Graphs
+
+struct UppaalLocation: NodeProtocol, Hashable, Codable, Sendable {
 
     var id: String
 
@@ -8,9 +10,23 @@ struct UppaalLocation: Hashable, Codable, Sendable {
 
     var invariant: UppaalInvariantLabel?
 
-    var x: Int
+    var x: Int {
+        didSet {
+            name?.x = x
+            invariant?.x = x
+        }
+    }
 
-    var y: Int
+    var y: Int {
+        didSet {
+            name?.y = y + 20
+            invariant?.y = y - 30
+        }
+    }
+
+    var mass: Double = 1
+
+    var force: Point2D = 0
 
     var modelRepresentation: String {
         // swiftlint:disable:next line_length

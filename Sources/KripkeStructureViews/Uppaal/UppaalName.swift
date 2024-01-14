@@ -1,8 +1,12 @@
-import Foundation
+import Graphs
 
 struct UppaalName: Hashable, Codable, Sendable, ExpressibleByStringLiteral {
 
     private var actualName: String
+
+    var x: Int
+
+    var y: Int
 
     var name: String {
         get {
@@ -12,10 +16,6 @@ struct UppaalName: Hashable, Codable, Sendable, ExpressibleByStringLiteral {
             actualName = (name.isEmpty || (name.first?.isLetter).map({ !$0 }) ?? true) ? "l" + name : name
         }
     }
-
-    var x: Int
-
-    var y: Int
 
     var modelRepresentation: String {
         "<name x=\"\(x)\" y=\"\(y)\">\(name)</name>"

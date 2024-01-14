@@ -19,6 +19,8 @@ let package = Package(
         // .package(url: /* package url */, from: "1.0.0"),
         .package(url: "https://github.com/mipalgu/swift_helpers", from: "2.0.0"),
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.13.3"),
+        .package(url: "https://github.com/mipalgu/Graphs", .upToNextMajor(from: "1.0.0")),
+        .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.0.0"))
 
     ],
     targets: [
@@ -32,7 +34,9 @@ let package = Package(
             dependencies: [
                 "KripkeStructure",
                 .product(name: "IO", package: "swift_helpers"),
-                .product(name: "SQLite", package: "SQLite.swift")
+                .product(name: "SQLite", package: "SQLite.swift"),
+                .product(name: "Graphs", package: "Graphs"),
+                .product(name: "Collections", package: "swift-collections")
             ]),
         .testTarget(
             name: "KripkeStructureTests",
