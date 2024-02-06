@@ -19,8 +19,16 @@ struct UppaalLocation: NodeProtocol, Hashable, Codable, Sendable {
 
     var y: Int {
         didSet {
-            name?.y = y + 20
-            invariant?.y = y - 30
+            if y > Int.max - 20 {
+                name?.y = Int.max
+            } else {
+                name?.y = y + 20
+            }
+            if y < Int.min + 30 {
+                invariant?.y = Int.min
+            } else {
+                invariant?.y = y - 30
+            }
         }
     }
 
