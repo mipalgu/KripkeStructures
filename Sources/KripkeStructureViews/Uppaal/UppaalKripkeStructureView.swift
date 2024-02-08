@@ -12,6 +12,8 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
 
     fileprivate let identifier: String
 
+    private let layoutIterations: Int
+
     fileprivate let outputStreamFactory: OutputStreamFactory
     
     fileprivate var stream: OutputStream!
@@ -53,9 +55,11 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
 
     public init(
         identifier: String,
+        layoutIterations: Int = 3,
         outputStreamFactory: OutputStreamFactory = FileOutputStreamFactory()
     ) {
         self.identifier = identifier
+        self.layoutIterations = layoutIterations
         self.outputStreamFactory = outputStreamFactory
     }
 
@@ -85,7 +89,7 @@ public final class UppaalKripkeStructureView: KripkeStructureView {
         try self.createInitial(&template)
         try self.createLocations(&template)
         try self.createTransitions(&template)
-        template.layout(times: 10, gravityConstant: Point2D(-10))
+        template.layout(times: layoutIterations, gravityConstant: Point2D(-10))
         template.adjustLabels()
         let model = UppaalModel(globalDeclarations: globalDeclarations, templates: [template])
         self.stream.write(model.modelRepresentation)
